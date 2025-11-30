@@ -1,0 +1,13 @@
+var R=require("../../../chunks/[turbopack]_runtime.js")("server/app/api/copilotkit/route.js")
+R.c("server/chunks/[root-of-the-server]__cb8b756b._.js")
+R.c("server/chunks/node_modules_@smithy_80360273._.js")
+R.c("server/chunks/node_modules_400bf1e5._.js")
+R.c("server/chunks/[root-of-the-server]__f2d8491b._.js")
+R.c("server/chunks/[root-of-the-server]__06277c99._.js")
+R.c("server/chunks/[root-of-the-server]__7af03536._.js")
+R.c("server/chunks/[root-of-the-server]__945e73d6._.js")
+R.c("server/chunks/[root-of-the-server]__19088ab8._.js")
+R.c("server/chunks/node_modules_@aws-sdk_core_dist-es_submodules_protocols_json_261f5d8c._.js")
+R.c("server/chunks/_next-internal_server_app_api_copilotkit_route_actions_c8258ff5.js")
+R.m(358321)
+module.exports=R.m(358321).exports

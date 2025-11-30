@@ -1,0 +1,10 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/citations/route": "app/api/citations/route.js",
+  "/api/copilotkit/route": "app/api/copilotkit/route.js",
+  "/api/health/qdrant/route": "app/api/health/qdrant/route.js",
+  "/api/ingest/route": "app/api/ingest/route.js",
+  "/knowledge/page": "app/knowledge/page.js",
+  "/page": "app/page.js"
+}

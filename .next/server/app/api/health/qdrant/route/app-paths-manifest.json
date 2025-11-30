@@ -1,0 +1,3 @@
+{
+  "/api/health/qdrant/route": "app/api/health/qdrant/route.js"
+}
