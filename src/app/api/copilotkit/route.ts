@@ -17,30 +17,36 @@ import {
 // Create the LangChain model
 const model = new ChatOpenAI({
   modelName: "gpt-4.1",
-  temperature: 0.3, // Lower temperature for more factual responses
+  temperature: 0.3,
 });
 
-// RAG System Prompt
-const RAG_SYSTEM_PROMPT = `You are an internal knowledge assistant. Answer questions ONLY using the provided context from our knowledge base.
+// System prompt that instructs the LLM to use the search tool
+const SYSTEM_PROMPT = `You are an internal knowledge assistant. You help users find information from their document knowledge base.
 
-SEARCH INFO: {searchInfo}
+IMPORTANT: When a user asks a question that requires searching the knowledge base, you MUST use the searchKnowledgeBase tool first. Do not answer questions about documents without searching first.
 
-RULES:
-1. Only answer from the context provided below - do not use external knowledge
-2. Cite your sources using this format: [Doc: {document name}, Page: {page number}]
-3. Include citations inline with your response for every piece of information
-4. If the answer is NOT in the context or confidence is low, say: "I don't have sufficient information about that in my knowledge base."
-5. Be concise, accurate, and helpful
-6. If multiple documents discuss the same topic, synthesize the information and cite all relevant sources
-7. Do not make up or infer information not explicitly stated in the context
-8. Consider the search confidence when formulating your response
+For greetings and casual conversation (like "hi", "hello", "how are you"), respond naturally without searching.
 
-CONTEXT FROM KNOWLEDGE BASE:
-{context}
+After receiving search results, synthesize the information and cite your sources using the citation format provided in the results.`;
 
-Remember: Only use information from the context above. Always cite your sources.`;
+// Detect if the message is a greeting or small talk
+function isGreetingOrSmallTalk(message: string): boolean {
+  const normalized = message.toLowerCase().trim();
+  const greetingPatterns = [
+    /^(hi|hello|hey|howdy|hiya|yo)[\s!.,?]*$/i,
+    /^(good\s*(morning|afternoon|evening|day))[\s!.,?]*$/i,
+    /^(what'?s?\s*up|sup|wassup)[\s!.,?]*$/i,
+    /^(how\s*(are\s*you|r\s*u|is\s*it\s*going))[\s!.,?]*$/i,
+    /^(thanks?|thank\s*you|thx|ty)[\s!.,?]*$/i,
+    /^(ok|okay|sure|alright|cool|great|nice|awesome)[\s!.,?]*$/i,
+    /^(bye|goodbye|see\s*ya|later|cya)[\s!.,?]*$/i,
+    /^(help|help\s*me|can\s*you\s*help)[\s!.,?]*$/i,
+    /^(who\s*are\s*you|what\s*(are|can)\s*you)[\s!.,?]*$/i,
+  ];
+  return greetingPatterns.some(pattern => pattern.test(normalized));
+}
 
-// Store citations and agent metadata for the current response (used by the UI)
+// Store citations for the UI
 let lastCitations: Array<{
   docName: string;
   pageNumber: number;
@@ -55,67 +61,14 @@ let lastAgentMetadata: {
   intent: string;
 } | null = null;
 
-// Create the service adapter using LangChain with RAG
+// Create the service adapter
 const serviceAdapter = new LangChainAdapter({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   chainFn: async ({ messages, tools }): Promise<any> => {
-    // Extract the last user message for retrieval
-    const lastMessage = messages[messages.length - 1];
-    const userQuery =
-      typeof lastMessage.content === "string"
-        ? lastMessage.content
-        : Array.isArray(lastMessage.content)
-          ? lastMessage.content
-              .filter((c): c is { type: "text"; text: string } => c.type === "text")
-              .map((c) => c.text)
-              .join(" ")
-          : "";
-
-    // Retrieve relevant context using agentic retrieval
-    let agentResult: AgentRetrievalResult | null = null;
-    let contextText = "";
-    let searchInfo = "No search performed";
-
-    if (userQuery.trim()) {
-      try {
-        console.log(`[RAG] Starting agentic retrieval for: "${userQuery}"`);
-
-        // Use agentic retrieval with self-reflection
-        agentResult = await agenticRetrieve(userQuery, {
-          maxIterations: 3,
-          confidenceThreshold: 0.7,
-          verbose: true,
-        });
-
-        contextText = formatAgentContextForLLM(agentResult);
-        lastAgentMetadata = getAgentMetadata(agentResult);
-
-        // Create search info summary
-        searchInfo = `Searched with ${agentResult.iterations} iteration(s), ${agentResult.searchQueries.length} queries. Confidence: ${(agentResult.finalConfidence * 100).toFixed(0)}%. Intent: ${agentResult.queryAnalysis.intent}`;
-
-        // Extract citations for the UI
-        lastCitations = await extractCitations(agentResult.chunks);
-
-        console.log(`[RAG] Agentic retrieval complete. Confidence: ${agentResult.finalConfidence.toFixed(2)}, Chunks: ${agentResult.chunks.length}`);
-      } catch (error) {
-        console.error("Error in agentic retrieval:", error);
-        contextText =
-          "Error retrieving from knowledge base. Please try again.";
-        searchInfo = "Search failed";
-        lastCitations = [];
-        lastAgentMetadata = null;
-      }
-    }
-
-    // Build the system prompt with context and search info
-    const systemPrompt = RAG_SYSTEM_PROMPT
-      .replace("{context}", contextText)
-      .replace("{searchInfo}", searchInfo);
-
-    // Prepend system message and transform messages
+    // Prepend system message
     const langChainMessages = [
-      new SystemMessage(systemPrompt),
-      ...messages.slice(0, -1).map((msg) => {
+      new SystemMessage(SYSTEM_PROMPT),
+      ...messages.map((msg) => {
         const content =
           typeof msg.content === "string"
             ? msg.content
@@ -126,7 +79,6 @@ const serviceAdapter = new LangChainAdapter({
                   .join(" ")
               : "";
 
-        // Check message type using getType() method or _getType()
         const msgType = String(msg.getType?.() || (msg as unknown as { _getType?: () => string })._getType?.() || "human");
         if (msgType === "human") {
           return new HumanMessage(content);
@@ -135,7 +87,6 @@ const serviceAdapter = new LangChainAdapter({
         }
         return new HumanMessage(content);
       }),
-      new HumanMessage(userQuery),
     ];
 
     // Bind tools if available
@@ -144,8 +95,62 @@ const serviceAdapter = new LangChainAdapter({
   },
 });
 
-// Create the CopilotKit runtime
-const runtime = new CopilotRuntime();
+// Create the CopilotKit runtime with the search action
+const runtime = new CopilotRuntime({
+  actions: () => {
+    return [
+      {
+        name: "searchKnowledgeBase",
+        description: "Search the knowledge base for information about documents. Use this tool when the user asks questions that require finding information from the document library. Returns relevant context with citations.",
+        parameters: [
+          {
+            name: "query",
+            type: "string",
+            description: "The search query - what the user wants to know about",
+            required: true,
+          },
+        ],
+        handler: async ({ query }: { query: string }) => {
+          console.log(`[RAG Action] Searching knowledge base for: "${query}"`);
+
+          try {
+            // Use agentic retrieval
+            const agentResult: AgentRetrievalResult = await agenticRetrieve(query, {
+              maxIterations: 3,
+              confidenceThreshold: 0.7,
+              verbose: true,
+            });
+
+            const contextText = formatAgentContextForLLM(agentResult);
+            lastAgentMetadata = getAgentMetadata(agentResult);
+            lastCitations = await extractCitations(agentResult.chunks);
+
+            console.log(`[RAG Action] Search complete. Confidence: ${agentResult.finalConfidence.toFixed(2)}, Chunks: ${agentResult.chunks.length}`);
+
+            // Return structured result for the LLM
+            return {
+              success: true,
+              confidence: agentResult.finalConfidence,
+              iterations: agentResult.iterations,
+              searchQueries: agentResult.searchQueries,
+              intent: agentResult.queryAnalysis.intent,
+              context: contextText,
+              citationInstructions: `When citing information, use this format: <citation docName="DocumentName.pdf" pageNumber="X" snippet="relevant text...">N</citation> where N is a sequential number.`,
+            };
+          } catch (error) {
+            console.error("[RAG Action] Search failed:", error);
+            lastCitations = [];
+            lastAgentMetadata = null;
+            return {
+              success: false,
+              error: "Failed to search knowledge base. Please try again.",
+            };
+          }
+        },
+      },
+    ];
+  },
+});
 
 export const POST = async (req: NextRequest) => {
   const { handleRequest } = copilotRuntimeNextJSAppRouterEndpoint({

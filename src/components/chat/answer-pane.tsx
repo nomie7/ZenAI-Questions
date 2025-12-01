@@ -5,21 +5,36 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { MessageSquare, FileText } from "lucide-react";
-import ReactMarkdown from "react-markdown";
 import { CitationList, type CitationData } from "./citation";
 import { CitationPanel } from "./citation-panel";
 import { AnswerPaneSkeleton } from "./thinking-indicator";
+import { StreamingText } from "./streaming-text";
 
 interface AnswerPaneProps {
   answer: string | null;
   citations: CitationData[];
   isLoading: boolean;
+  /** Enable streaming text animation */
+  enableStreaming?: boolean;
 }
 
-export function AnswerPane({ answer, citations, isLoading }: AnswerPaneProps) {
+export function AnswerPane({ answer, citations, isLoading, enableStreaming = true }: AnswerPaneProps) {
   const [selectedCitation, setSelectedCitation] = useState<CitationData | null>(
     null
   );
+  const [prevAnswer, setPrevAnswer] = useState<string | null>(null);
+  const [isNewAnswer, setIsNewAnswer] = useState(false);
+
+  // Track when we get a new answer to trigger streaming animation
+  useEffect(() => {
+    if (answer && answer !== prevAnswer) {
+      setIsNewAnswer(true);
+      setPrevAnswer(answer);
+      // Reset streaming state after animation completes
+      const timeout = setTimeout(() => setIsNewAnswer(false), 3000);
+      return () => clearTimeout(timeout);
+    }
+  }, [answer, prevAnswer]);
 
   // Reset selected citation when answer changes
   useEffect(() => {
@@ -48,37 +63,20 @@ export function AnswerPane({ answer, citations, isLoading }: AnswerPaneProps) {
                   <AnswerPaneSkeleton />
                 ) : answer ? (
                   <div className="space-y-4">
-                    {/* Rendered answer with markdown */}
-                    <div className="prose prose-sm max-w-none">
-                      <ReactMarkdown
-                        components={{
-                          // Style code blocks
-                          code: ({ children, className }) => {
-                            const isInline = !className;
-                            return isInline ? (
-                              <code className="bg-gray-100 px-1 py-0.5 rounded text-sm">
-                                {children}
-                              </code>
-                            ) : (
-                              <code className={className}>{children}</code>
-                            );
-                          },
-                          // Style links
-                          a: ({ children, href }) => (
-                            <a
-                              href={href}
-                              className="text-blue-600 hover:underline"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              {children}
-                            </a>
-                          ),
-                        }}
-                      >
-                        {answer}
-                      </ReactMarkdown>
-                    </div>
+                    {/* Rendered answer with streaming animation */}
+                    {enableStreaming && isNewAnswer ? (
+                      <StreamingText
+                        text={answer}
+                        isStreaming={isNewAnswer}
+                        showCursor={isNewAnswer}
+                      />
+                    ) : (
+                      <StreamingText
+                        text={answer}
+                        isStreaming={false}
+                        showCursor={false}
+                      />
+                    )}
 
                     {/* Citations section */}
                     {citations.length > 0 && (
