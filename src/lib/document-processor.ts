@@ -1,6 +1,13 @@
 import { v4 as uuidv4 } from "uuid";
 import { getParser, type ParserType, type ParsedDocument } from "./parsers";
 import { uploadDocument, uploadPageImage, getSignedUrl } from "./storage";
+import {
+  ChunkingStrategy,
+  getChunkingStrategy,
+  DEFAULT_CHUNKING_CONFIG,
+  createPageChunker,
+  createAgenticChunker,
+} from "./chunking";
 
 export interface ProcessedChunk {
   chunkId: string;
@@ -28,7 +35,7 @@ export interface ProcessedDocument {
   processedAt: Date;
 }
 
-// Chunking configuration
+// Chunking configuration (legacy, kept for backward compatibility)
 const CHUNK_SIZE = 500; // characters
 const CHUNK_OVERLAP = 50; // characters
 
@@ -37,7 +44,7 @@ const CHUNK_OVERLAP = 50; // characters
  * 1. Parse the document (extract text and images)
  * 2. Upload original file to MinIO
  * 3. Upload page images to MinIO
- * 4. Chunk the text with overlap
+ * 4. Chunk the text with appropriate strategy
  */
 export async function processDocument(
   file: Buffer,
@@ -62,7 +69,21 @@ export async function processDocument(
   // 2. Upload original file
   const originalPath = await uploadDocument(docId, file, filename);
 
-  // 3. Process each page
+  // 3. Determine chunking strategy based on file type
+  const chunkingStrategy = getChunkingStrategy(filename, parserType);
+  const chunkingConfig = DEFAULT_CHUNKING_CONFIG[chunkingStrategy];
+
+  console.log(`Using chunking strategy: ${chunkingStrategy}`);
+
+  // 4. Create appropriate chunker
+  const chunker =
+    chunkingStrategy === ChunkingStrategy.PAGE_BASED
+      ? createPageChunker()
+      : chunkingStrategy === ChunkingStrategy.AGENTIC
+        ? createAgenticChunker(chunkingConfig)
+        : null;
+
+  // 5. Process each page
   const pages: ProcessedPage[] = [];
   let totalChunks = 0;
 
@@ -73,8 +94,15 @@ export async function processDocument(
       imageUrl = await uploadPageImage(docId, page.pageNumber, page.imageBuffer);
     }
 
-    // Chunk the page text
-    const chunks = chunkText(page.text, page.pageNumber);
+    // Chunk the page text using appropriate strategy
+    let chunks: ProcessedChunk[];
+    if (chunker) {
+      chunks = await chunker.chunk(page.text, page.pageNumber, chunkingConfig);
+    } else {
+      // Fallback to legacy fixed-size chunking
+      chunks = chunkText(page.text, page.pageNumber);
+    }
+
     totalChunks += chunks.length;
 
     pages.push({
@@ -85,7 +113,7 @@ export async function processDocument(
     });
   }
 
-  console.log(`Created ${totalChunks} chunks across ${pages.length} pages`);
+  console.log(`Created ${totalChunks} chunks across ${pages.length} pages using ${chunkingStrategy} strategy`);
 
   return {
     docId,
@@ -199,12 +227,12 @@ export function getDocumentStats(doc: ProcessedDocument): {
   const avgChunkSize =
     doc.totalChunks > 0
       ? Math.round(
-          doc.pages.reduce(
-            (sum, p) =>
-              sum + p.chunks.reduce((cs, c) => cs + c.text.length, 0),
-            0
-          ) / doc.totalChunks
-        )
+        doc.pages.reduce(
+          (sum, p) =>
+            sum + p.chunks.reduce((cs, c) => cs + c.text.length, 0),
+          0
+        ) / doc.totalChunks
+      )
       : 0;
 
   return {

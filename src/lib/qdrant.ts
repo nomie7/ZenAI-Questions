@@ -108,7 +108,7 @@ export async function upsertVectors(
 }
 
 /**
- * Search for similar vectors
+ * Search for similar vectors with retry logic for connection errors
  */
 export async function searchVectors(
   vector: number[],
@@ -121,21 +121,58 @@ export async function searchVectors(
     payload: Record<string, unknown>;
   }>
 > {
-  const qdrant = getClient();
+  const maxRetries = 3;
+  let lastError: Error | null = null;
 
-  const results = await qdrant.search(COLLECTION_NAME, {
-    vector,
-    limit,
-    filter: filter as never,
-    with_payload: true,
-    score_threshold: 0.5, // Only return relevant results
-  });
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const qdrant = getClient();
 
-  return results.map((r) => ({
-    id: String(r.id),
-    score: r.score,
-    payload: (r.payload as Record<string, unknown>) || {},
-  }));
+      const results = await qdrant.search(COLLECTION_NAME, {
+        vector,
+        limit,
+        filter: filter as never,
+        with_payload: true,
+        score_threshold: 0.5, // Only return relevant results
+      });
+
+      return results.map((r) => ({
+        id: String(r.id),
+        score: r.score,
+        payload: (r.payload as Record<string, unknown>) || {},
+      }));
+    } catch (error) {
+      lastError = error as Error;
+      const errorMessage = (error as Error).message || String(error);
+
+      // Check if it's a socket/connection error
+      if (
+        errorMessage.includes("socket") ||
+        errorMessage.includes("ECONNRESET") ||
+        errorMessage.includes("closed") ||
+        (error as any).code === "UND_ERR_SOCKET"
+      ) {
+        console.warn(
+          `[Qdrant] Connection error on attempt ${attempt}/${maxRetries}, resetting client...`
+        );
+
+        // Reset the client singleton to force new connection
+        client = null;
+
+        // Wait before retry (exponential backoff)
+        if (attempt < maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, 100 * attempt));
+          continue;
+        }
+      }
+
+      // If it's not a connection error or we've exhausted retries, throw
+      throw error;
+    }
+  }
+
+  // Should never reach here, but TypeScript needs this
+  throw lastError || new Error("Search failed after retries");
 }
 
 /**
