@@ -31,7 +31,7 @@ Format your responses for clarity and readability:
 When citing information from the knowledge base:
 
 1. **Inline citations**: Reference sources directly in your text using the citation format:
-   \`<citation docName="DocumentName.pdf" pageNumber="X" snippet="relevant quoted text...">N</citation>\`
+   \`<citation docName="DocumentName.pdf" pageNumber="X" index="N">relevant quoted text...</citation>\`
 
 2. **Be specific**: Include the actual text snippet that supports your claim
 
@@ -45,8 +45,8 @@ When citing information from the knowledge base:
 
 Based on the knowledge base, here are the main points:
 
-- **Point 1**: Description of finding <citation docName="Report.pdf" pageNumber="5" snippet="The data shows...">1</citation>
-- **Point 2**: Another important detail <citation docName="Guide.pdf" pageNumber="12" snippet="Users should...">2</citation>
+- **Point 1**: Description of finding <citation docName="Report.pdf" pageNumber="5" index="1">The data shows...</citation>
+- **Point 2**: Another important detail <citation docName="Guide.pdf" pageNumber="12" index="2">Users should...</citation>
 
 ### Additional Details
 
@@ -107,9 +107,9 @@ What would you like to know?`;
  * Labels configuration for CopilotChat
  */
 export const CHAT_LABELS = {
-  title: "Knowledge Assistant",
-  initial: INITIAL_MESSAGE,
-  placeholder: "Ask a question about your documents...",
-  stopGenerating: "Stop",
-  regenerate: "Regenerate",
+   title: "Knowledge Assistant",
+   initial: INITIAL_MESSAGE,
+   placeholder: "Ask a question about your documents...",
+   stopGenerating: "Stop",
+   regenerate: "Regenerate",
 };

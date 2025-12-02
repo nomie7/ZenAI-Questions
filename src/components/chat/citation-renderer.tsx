@@ -20,6 +20,7 @@ interface CitationTagProps {
   pageNumber?: string;
   imageUrl?: string;
   snippet?: string;
+  index?: string;
 }
 
 interface CitationProps {
@@ -183,22 +184,39 @@ function CitationBadge({
  *
  * This creates custom renderers for <citation> tags in the LLM output.
  * Usage in LLM instructions:
- *   <citation docName="Report.pdf" pageNumber="5" snippet="text...">1</citation>
+ *   <citation docName="Report.pdf" pageNumber="5" index="1">Snippet text...</citation>
  */
 export function createCitationTagRenderers(): ComponentsMap<{
   citation: CitationTagProps;
 }> {
   return {
-    citation: ({ children, docName, pageNumber, imageUrl, snippet }) => (
-      <CitationBadge
-        docName={docName}
-        pageNumber={pageNumber}
-        imageUrl={imageUrl}
-        snippet={snippet}
-      >
-        {children}
-      </CitationBadge>
-    ),
+    citation: ({ children, docName, pageNumber, imageUrl, snippet, index }) => {
+      // Handle new format: <citation index="1">snippet</citation>
+      if (index) {
+        return (
+          <CitationBadge
+            docName={docName}
+            pageNumber={pageNumber}
+            imageUrl={imageUrl}
+            snippet={typeof children === "string" ? children : undefined}
+          >
+            {index}
+          </CitationBadge>
+        );
+      }
+
+      // Handle legacy format: <citation snippet="...">1</citation>
+      return (
+        <CitationBadge
+          docName={docName}
+          pageNumber={pageNumber}
+          imageUrl={imageUrl}
+          snippet={snippet}
+        >
+          {children}
+        </CitationBadge>
+      );
+    },
   };
 }
 

@@ -1,5 +1,13 @@
 import { pdf } from "pdf-to-img";
+
+import { exec } from "child_process";
+import { promisify } from "util";
+import fs from "fs/promises";
+import path from "path";
+import os from "os";
 import type { DocumentParser, ParsedDocument, ParsedPage } from "./index";
+
+const execAsync = promisify(exec);
 
 /**
  * Element returned by Unstructured API
@@ -82,6 +90,8 @@ export class UnstructuredParser implements DocumentParser {
     }
 
     const isPdf = ext === "pdf";
+    const isPpt = ext === "ppt" || ext === "pptx";
+
     console.log(`Processing ${ext.toUpperCase()} with Unstructured API: ${filename}`);
 
     // For PDFs, process page-by-page (avoids timeout on large docs)
@@ -89,8 +99,54 @@ export class UnstructuredParser implements DocumentParser {
       return this.processPdfPageByPage(file, filename);
     }
 
+    // For PPTs, convert to PDF first then process page-by-page
+    if (isPpt) {
+      try {
+        console.log("Converting PPT to PDF for image extraction...");
+        const pdfBuffer = await this.convertPptToPdf(file, filename);
+        return this.processPdfPageByPage(pdfBuffer, filename.replace(/\.(ppt|pptx)$/i, ".pdf"));
+      } catch (error) {
+        console.error("Failed to convert PPT to PDF:", error);
+        console.log("Falling back to standard Unstructured processing for PPT...");
+        // Fallback to standard processing if conversion fails
+        return this.processWholeDocument(file, filename);
+      }
+    }
+
     // For other formats, process whole document
     return this.processWholeDocument(file, filename);
+  }
+
+  /**
+   * Convert PPT/PPTX to PDF using LibreOffice
+   */
+  private async convertPptToPdf(file: Buffer, filename: string): Promise<Buffer> {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "ppt-conversion-"));
+    const inputPath = path.join(tempDir, filename);
+    const outputPath = path.join(tempDir, filename.replace(/\.(ppt|pptx)$/i, ".pdf"));
+
+    try {
+      // Write input file
+      await fs.writeFile(inputPath, file);
+
+      // Run LibreOffice conversion
+      // --headless: no UI
+      // --convert-to pdf: output format
+      // --outdir: output directory
+      const command = `soffice --headless --convert-to pdf --outdir "${tempDir}" "${inputPath}"`;
+      await execAsync(command);
+
+      // Read resulting PDF
+      const pdfBuffer = await fs.readFile(outputPath);
+      return pdfBuffer;
+    } finally {
+      // Cleanup temp directory
+      try {
+        await fs.rm(tempDir, { recursive: true, force: true });
+      } catch (e) {
+        console.error("Failed to cleanup temp dir:", e);
+      }
+    }
   }
 
   /**
