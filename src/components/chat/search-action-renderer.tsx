@@ -86,7 +86,7 @@ export function SearchActionRenderer() {
                   </span>
                   <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full",
                     (searchResult.confidence || 0) >= 0.7 ? "bg-green-100 text-green-700" :
-                    (searchResult.confidence || 0) >= 0.5 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
+                      (searchResult.confidence || 0) >= 0.5 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
                   )}>
                     {Math.round((searchResult.confidence || 0) * 100)}% confidence
                   </span>
@@ -114,7 +114,7 @@ export function SearchActionRenderer() {
         );
       }
 
-      return <></>;
+      return null as any;
     },
   });
 
