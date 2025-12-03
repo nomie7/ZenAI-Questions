@@ -74,9 +74,9 @@ const serviceAdapter = new LangChainAdapter({
             ? msg.content
             : Array.isArray(msg.content)
               ? msg.content
-                  .filter((c): c is { type: "text"; text: string } => c.type === "text")
-                  .map((c) => c.text)
-                  .join(" ")
+                .filter((c): c is { type: "text"; text: string } => c.type === "text")
+                .map((c) => c.text)
+                .join(" ")
               : "";
 
         const msgType = String(msg.getType?.() || (msg as unknown as { _getType?: () => string })._getType?.() || "human");
@@ -121,7 +121,7 @@ const runtime = new CopilotRuntime({
               verbose: true,
             });
 
-            const contextText = formatAgentContextForLLM(agentResult);
+            const contextText = await formatAgentContextForLLM(agentResult);
             lastAgentMetadata = getAgentMetadata(agentResult);
             lastCitations = await extractCitations(agentResult.chunks);
 

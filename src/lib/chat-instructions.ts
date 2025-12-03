@@ -30,23 +30,33 @@ Format your responses for clarity and readability:
 
 When citing information from the knowledge base:
 
-1. **Inline citations**: Reference sources directly in your text using the citation format:
-   \`<citation docName="DocumentName.pdf" pageNumber="X" index="N">relevant quoted text...</citation>\`
+1. **Citation Format**: Use JSON-encoded citation tags with this exact structure:
+   \`\`\`
+   <citation>{"index":N,"docName":"DocumentName.pdf","pageNumber":"X","imageUrl":"https://...","text":"relevant quoted text"}</citation>
+   \`\`\`
 
-2. **Be specific**: Include the actual text snippet that supports your claim
+2. **IMPORTANT**: 
+   - Always use valid JSON inside the citation tags
+   - Include ALL fields: index, docName, pageNumber, imageUrl, and text
+   - The imageUrl is provided in the context as "Image URL: https://..."
+   - The text field should contain the actual quote from the document
+   - The index should be a sequential number (1, 2, 3, etc.)
 
-3. **Number citations**: Use sequential numbers [1], [2], etc.
+3. **Example**:
+   \`\`\`
+   The data shows significant growth <citation>{"index":1,"docName":"Report.pdf","pageNumber":"5","imageUrl":"https://minio.devstaq.dev/...","text":"The quarterly revenue increased by 23%"}</citation>
+   \`\`\`
 
-4. **Source section**: End your response with a "Sources" section listing all citations
+4. **Multiple citations**: Number them sequentially (index: 1, 2, 3, etc.)
 
 ## Example Response Format
 
 ## Key Findings
 
-Based on the knowledge base, here are the main points:
+Based on the knowledge base:
 
-- **Point 1**: Description of finding <citation docName="Report.pdf" pageNumber="5" index="1">The data shows...</citation>
-- **Point 2**: Another important detail <citation docName="Guide.pdf" pageNumber="12" index="2">Users should...</citation>
+- **Point 1**: Description <citation>{"index":1,"docName":"Report.pdf","pageNumber":"5","imageUrl":"https://...","text":"The data shows..."}</citation>
+- **Point 2**: Another detail <citation>{"index":2,"docName":"Guide.pdf","pageNumber":"12","imageUrl":"https://...","text":"Users should..."}</citation>
 
 ### Additional Details
 

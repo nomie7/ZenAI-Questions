@@ -136,8 +136,8 @@ export async function reflectOnResults(
 
   const previousAttempts = previousReflections.length > 0
     ? `\nPrevious search attempts:\n${previousReflections.map((r, i) =>
-        `Attempt ${i + 1}: Confidence ${r.confidence}, Missing: ${r.missingInformation.join(", ")}`
-      ).join("\n")}\n`
+      `Attempt ${i + 1}: Confidence ${r.confidence}, Missing: ${r.missingInformation.join(", ")}`
+    ).join("\n")}\n`
     : "";
 
   const prompt = `You are evaluating if retrieved documents answer a user's question.
@@ -358,20 +358,61 @@ export async function agenticRetrieve(
 
 /**
  * Format agent retrieval result for LLM context
+ * Generates signed URLs for images so they can be accessed by the browser
  */
-export function formatAgentContextForLLM(result: AgentRetrievalResult): string {
+export async function formatAgentContextForLLM(result: AgentRetrievalResult): Promise<string> {
   if (result.chunks.length === 0) {
     return "No relevant documents found in the knowledge base.";
   }
 
-  const contextBlocks = result.chunks.map((chunk, index) => {
-    return `[${index + 1}] Document: "${chunk.docName}", Page ${chunk.pageNumber}
+  // Import getSignedUrl here to avoid circular dependencies
+  const { getSignedUrl } = await import("./storage");
+
+  console.log(`[formatAgentContextForLLM] Processing ${result.chunks.length} chunks for signed URLs...`);
+
+  // Generate signed URLs for all images in parallel
+  const contextBlocksPromises = result.chunks.map(async (chunk, index) => {
+    let signedImageUrl = "";
+
+    // Convert MinIO object path to signed URL
+    if (chunk.imageUrl) {
+      try {
+        const rawUrl = await getSignedUrl(chunk.imageUrl, 3600); // 1 hour expiry
+        // Ensure it's a string (in case MinIO returns an object)
+        signedImageUrl = typeof rawUrl === 'string' ? rawUrl : String(rawUrl);
+        console.log(`[formatAgentContextForLLM] Chunk ${index + 1}: Generated signed URL (${signedImageUrl.substring(0, 60)}...)`);
+      } catch (error) {
+        console.warn(`[formatAgentContextForLLM] Failed to generate signed URL for ${chunk.imageUrl}:`, error);
+      }
+    } else {
+      console.warn(`[formatAgentContextForLLM] Chunk ${index + 1}: NO imageUrl in chunk`);
+    }
+
+    // Include signed URL in context so LLM can use it in citations
+    const imageInfo = signedImageUrl ? `\nImage URL: ${signedImageUrl}` : "";
+    return `[${index + 1}] Document: "${chunk.docName}", Page ${chunk.pageNumber}${imageInfo}
 ${chunk.text}`;
   });
 
+  const contextBlocks = await Promise.all(contextBlocksPromises);
+
   const searchInfo = `Search conducted with ${result.iterations} iteration(s), ${result.searchQueries.length} queries, confidence ${result.finalConfidence.toFixed(2)}`;
 
-  return `${searchInfo}\n\n---\n\n${contextBlocks.join("\n\n---\n\n")}`;
+  const finalContext = `${searchInfo}\n\n---\n\n${contextBlocks.join("\n\n---\n\n")}`;
+
+  // Log a preview to verify Image URLs are in the context
+  const imageUrlCount = (finalContext.match(/Image URL: https/g) || []).length;
+  console.log(`[formatAgentContextForLLM] Context formatted. Contains ${imageUrlCount} signed image URLs`);
+
+  // Debug: Log a snippet of the context to see the Image URL format
+  const imageUrlMatch = finalContext.match(/Image URL: ([^\n]+)/);
+  if (imageUrlMatch) {
+    console.log(`[formatAgentContextForLLM] Sample Image URL in context: ${imageUrlMatch[1].substring(0, 80)}...`);
+  } else {
+    console.log(`[formatAgentContextForLLM] WARNING: No Image URL found in context!`);
+  }
+
+  return finalContext;
 }
 
 /**
