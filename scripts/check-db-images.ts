@@ -21,7 +21,7 @@ async function checkDatabase() {
         const collectionInfo = await client.getCollection(collectionName);
         console.log(`Collection: ${collectionName}`);
         console.log(`Total points: ${collectionInfo.points_count}`);
-        console.log(`Vector size: ${collectionInfo.config.params.vectors.size}`);
+        console.log(`Vector size: ${collectionInfo.config.params.vectors?.size}`);
 
         if (collectionInfo.points_count === 0) {
             console.log("\n❌ Collection is empty! No documents have been ingested.");

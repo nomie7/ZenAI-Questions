@@ -254,8 +254,8 @@ function CitationBadge({
  *
  * This creates custom renderers for <citation> tags in the LLM output.
  * 
- * NEW FORMAT (JSON-encoded to work around react-markdown stripping attributes):
- *   <citation>{"index":1,"docName":"Report.pdf","pageNumber":"5","imageUrl":"https://...","text":"full text"}</citation>
+ * FORMAT: Pipe-delimited to avoid react-markdown autolinking issues:
+ *   <citation>index|docName|pageNumber|imageUrl|text</citation>
  */
 export function createCitationTagRenderers(): ComponentsMap<{
   citation: CitationTagProps;
@@ -265,57 +265,66 @@ export function createCitationTagRenderers(): ComponentsMap<{
       // Debug: Log what we receive
       console.log('[Citation Parser] Raw children:', children, typeof children);
 
-      let citationData: {
-        index?: string | number;
-        docName?: string;
-        pageNumber?: string | number;
-        imageUrl?: string;
-        text?: string;
-      } = {};
-
-      // Extract text from children (which may be an array with React elements)
-      let jsonString = '';
+      // Extract the text content from children
+      let contentString = '';
 
       if (typeof children === 'string') {
-        jsonString = children;
+        contentString = children;
       } else if (Array.isArray(children)) {
-        // react-markdown converts URLs in the JSON to React <a> elements
-        // We need to extract text from all parts and reconstruct the JSON
-        jsonString = children.map(child => {
+        // react-markdown may convert URLs to link elements
+        // We need to extract the actual URL from link elements
+        contentString = children.map(child => {
           if (typeof child === 'string') {
             return child;
           } else if (child && typeof child === 'object' && 'props' in child) {
-            // It's a React element - extract its children (the URL text)
-            return child.props?.children || '';
+            // It's a React element - likely a link
+            // For links, get the href (the actual URL) instead of the link text
+            const href = child.props?.href;
+            const childText = child.props?.children;
+            // Use href if available (it's the actual URL), otherwise use the text
+            return href || childText || '';
           }
           return '';
         }).join('');
       } else if (children) {
-        jsonString = String(children);
+        contentString = String(children);
       }
 
-      console.log('[Citation Parser] Reconstructed JSON string:', jsonString);
+      console.log('[Citation Parser] Extracted content:', contentString);
 
-      // Try to parse JSON
-      if (jsonString) {
-        try {
-          citationData = JSON.parse(jsonString);
-          console.log('[Citation Parser] Parsed JSON:', citationData);
-        } catch (error) {
-          console.warn('[Citation Parser] Failed to parse JSON:', error);
-          console.warn('[Citation Parser] JSON string was:', jsonString);
-          // Fallback: treat as plain text
-          citationData = { text: jsonString };
-        }
+      // URL-decode the content to handle %7C encoded pipes
+      const decodedContent = decodeURIComponent(contentString);
+      console.log('[Citation Parser] Decoded content:', decodedContent);
+
+      // Parse pipe-delimited format: index|docName|pageNumber|imageUrl|text
+      const parts = decodedContent.split('|');
+
+      let index = '?';
+      let docName = 'Document';
+      let pageNumber = '?';
+      let imageUrl: string | undefined = undefined;
+      let text: string | undefined = undefined;
+
+      if (parts.length >= 5) {
+        index = parts[0].trim();
+        docName = parts[1].trim();
+        pageNumber = parts[2].trim();
+        imageUrl = parts[3].trim();
+        // Remaining parts join back together (in case text had pipes)
+        text = parts.slice(4).join('|').trim();
+      } else {
+        console.warn('[Citation Parser] Invalid format, expected 5 parts, got:', parts.length);
+        // Fallback
+        text = decodedContent;
       }
 
-      const {
-        index = '?',
-        docName = 'Document',
-        pageNumber = '?',
+      console.log('[Citation Parser] Parsed values:', {
+        index,
+        docName,
+        pageNumber,
         imageUrl,
-        text,
-      } = citationData;
+        textLength: text?.length
+      });
 
       return (
         <CitationBadge

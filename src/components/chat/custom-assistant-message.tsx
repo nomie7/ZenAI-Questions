@@ -20,6 +20,10 @@ export function CustomAssistantMessage(props: AssistantMessageProps) {
   const { message, isLoading, subComponent, markdownTagRenderers } = props;
   const content = message?.content || "";
 
+  // Debug: Log the raw message content to see what LLM is sending
+  console.log('[CustomAssistantMessage] Raw content:', content);
+  console.log('[CustomAssistantMessage] Has <citation> tags?', content.includes('<citation>'));
+
   // Get generativeUI if available (new way)
   const generativeUI = message?.generativeUI?.();
 
