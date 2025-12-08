@@ -49,12 +49,15 @@ function resolveMinioEndpoint(): {
       const url = new URL(MINIO_ENDPOINT);
       const endPoint = url.hostname;
       const useSSL = url.protocol === "https:";
+      // Use port from URL if specified, otherwise fall back to MINIO_PORT env var
       const port =
         url.port && Number(url.port) > 0
           ? Number(url.port)
-          : useSSL
-            ? 443
-            : 80;
+          : MINIO_PORT > 0
+            ? MINIO_PORT
+            : useSSL
+              ? 443
+              : 80;
       return { endPoint, port, useSSL };
     } catch {
       // Fall through to defaults

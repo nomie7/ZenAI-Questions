@@ -72,7 +72,13 @@ export async function ingestDocument(
 
   try {
     // Ensure infrastructure is ready
-    await Promise.all([ensureCollection(), ensureBucket()]);
+    console.log("[ingest] Ensuring Qdrant collection...");
+    await ensureCollection();
+    console.log("[ingest] Qdrant collection ready");
+
+    console.log("[ingest] Ensuring MinIO bucket...");
+    await ensureBucket();
+    console.log("[ingest] MinIO bucket ready");
 
     // Update registry to show processing
     documentRegistry.set(docId, {
@@ -100,6 +106,7 @@ export async function ingestDocument(
     }
 
     // Process the document
+    console.log("[ingest] Processing document with parser:", parserType);
     const processed: ProcessedDocument = await processDocument(
       file,
       filename,
@@ -129,7 +136,7 @@ export async function ingestDocument(
       }
     }
 
-    console.log(`Generating embeddings for ${allChunks.length} chunks...`);
+    console.log("[ingest] Document processed, generating embeddings for", allChunks.length, "chunks...");
 
     // Generate embeddings in batches
     const BATCH_SIZE = 100;
@@ -269,10 +276,12 @@ export async function deleteDocument(docId: string): Promise<void> {
  * Get all documents in the registry
  */
 export async function listDocuments(): Promise<DocumentRecord[]> {
-  if (!SKIP_REGISTRY_SYNC && documentRegistry.size === 0) {
+  // Always sync from Qdrant to ensure we have the latest data
+  if (!SKIP_REGISTRY_SYNC) {
     await syncRegistryFromQdrant();
   }
 
+  console.log(`[listDocuments] Returning ${documentRegistry.size} documents`);
   return Array.from(documentRegistry.values()).sort(
     (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
   );
@@ -307,6 +316,7 @@ async function syncRegistryFromQdrant(): Promise<void> {
   try {
     const qdrant = getClient();
     const collection = getCollectionName();
+    console.log(`[syncRegistry] Syncing from Qdrant collection: ${collection}`);
 
     let offset: number | string | undefined = undefined;
     const aggregated = new Map<string, DocumentRecord>();
@@ -370,9 +380,10 @@ async function syncRegistryFromQdrant(): Promise<void> {
     for (const [docId, record] of aggregated.entries()) {
       documentRegistry.set(docId, record);
     }
+    console.log(`[syncRegistry] Synced ${aggregated.size} documents from Qdrant`);
   } catch (error) {
     console.warn(
-      "Unable to sync registry from Qdrant, using in-memory only:",
+      "[syncRegistry] Unable to sync registry from Qdrant, using in-memory only:",
       (error as Error).message
     );
   }
