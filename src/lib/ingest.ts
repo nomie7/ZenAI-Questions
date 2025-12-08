@@ -135,20 +135,30 @@ export async function ingestDocument(
     const BATCH_SIZE = 100;
     const points: Array<{
       id: string;
-      vector: number[];
+      vector: {
+        dense: number[];
+        text: { text: string; model: string }; // BM25 inference
+      };
       payload: Record<string, unknown>;
     }> = [];
 
     for (let i = 0; i < allChunks.length; i += BATCH_SIZE) {
       const batch = allChunks.slice(i, i + BATCH_SIZE);
       const texts = batch.map((c) => c.text);
-      const embeddings = await embedTexts(texts);
+      const denseEmbeddings = await embedTexts(texts);
 
       for (let j = 0; j < batch.length; j++) {
         const chunk = batch[j];
         points.push({
           id: chunk.chunkId,
-          vector: embeddings[j],
+          vector: {
+            dense: denseEmbeddings[j],
+            // Qdrant will generate BM25 sparse vector from this text
+            text: {
+              text: chunk.text,
+              model: "qdrant/bm25",
+            },
+          },
           payload: {
             doc_id: docId,
             doc_name: docName,

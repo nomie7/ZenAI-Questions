@@ -7,6 +7,8 @@ const COLLECTION_NAME = process.env.QDRANT_COLLECTION_NAME || "knowledge_base";
 
 // OpenAI embedding dimension (text-embedding-3-small)
 const EMBEDDING_DIMENSION = 1536;
+const DENSE_VECTOR_NAME = "dense";
+const SPARSE_VECTOR_NAME = "text";
 
 let client: QdrantClient | null = null;
 
@@ -50,11 +52,21 @@ export async function ensureCollection(): Promise<void> {
     );
 
     if (!exists) {
-      // Create collection with cosine similarity for OpenAI embeddings
+      // Create collection with named dense vector and BM25 inference for hybrid search
       await qdrant.createCollection(COLLECTION_NAME, {
         vectors: {
-          size: EMBEDDING_DIMENSION,
-          distance: "Cosine",
+          [DENSE_VECTOR_NAME]: {
+            size: EMBEDDING_DIMENSION,
+            distance: "Cosine",
+          },
+        },
+        sparse_vectors: {
+          [SPARSE_VECTOR_NAME]: {
+            modifier: "idf", // BM25-style IDF weighting for built-in inference
+            index: {
+              on_disk: true,
+            },
+          },
         },
         // Enable payload indexing for common filter fields
         optimizers_config: {
@@ -92,7 +104,7 @@ export async function ensureCollection(): Promise<void> {
 export async function upsertVectors(
   points: Array<{
     id: string;
-    vector: number[];
+    vector: any;
     payload: Record<string, unknown>;
   }>
 ): Promise<void> {
@@ -101,7 +113,7 @@ export async function upsertVectors(
   await qdrant.upsert(COLLECTION_NAME, {
     points: points.map((p) => ({
       id: p.id,
-      vector: p.vector,
+      vector: p.vector as any,
       payload: p.payload,
     })),
   });
@@ -129,7 +141,10 @@ export async function searchVectors(
       const qdrant = getClient();
 
       const results = await qdrant.search(COLLECTION_NAME, {
-        vector,
+        vector: {
+          name: DENSE_VECTOR_NAME,
+          vector,
+        },
         limit,
         filter: filter as never,
         with_payload: true,
@@ -194,4 +209,67 @@ export async function deleteVectorsByFilter(
 export async function getCollectionInfo(): Promise<unknown> {
   const qdrant = getClient();
   return qdrant.getCollection(COLLECTION_NAME);
+}
+
+/**
+ * Hybrid query (dense + sparse) using Query API with fusion (RRF by default)
+ * Sparse vectors are generated server-side by Qdrant using BM25 inference
+ */
+export async function queryHybrid(options: {
+  denseVector: number[];
+  queryText: string; // Raw text for BM25 inference
+  limit: number;
+  filter?: Record<string, unknown>;
+  fusion?: "rrf" | "dbsf";
+  candidates?: number;
+}): Promise<
+  Array<{
+    id: string;
+    score: number;
+    payload: Record<string, unknown>;
+  }>
+> {
+  const {
+    denseVector,
+    queryText,
+    limit,
+    filter,
+    fusion = "rrf",
+    candidates = Math.max(limit * 3, 50),
+  } = options;
+
+  const qdrant = getClient();
+
+  const response = await qdrant.query(COLLECTION_NAME, {
+    prefetch: [
+      {
+        // BM25 sparse query using inference API
+        query: {
+          text: queryText,
+          model: "qdrant/bm25",
+        },
+        using: SPARSE_VECTOR_NAME,
+        limit: candidates,
+        filter: filter as never,
+      },
+      {
+        // Dense semantic query
+        query: denseVector,
+        using: DENSE_VECTOR_NAME,
+        limit: candidates,
+        filter: filter as never,
+      },
+    ],
+    query: { fusion },
+    limit,
+    with_payload: true,
+  });
+
+  const points = (response as any)?.points ?? response ?? [];
+
+  return points.map((r: any) => ({
+    id: String(r.id),
+    score: r.score,
+    payload: (r.payload as Record<string, unknown>) || {},
+  }));
 }

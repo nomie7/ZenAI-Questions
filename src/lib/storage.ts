@@ -85,6 +85,27 @@ export async function ensureBucket(): Promise<void> {
   if (!exists) {
     await minio.makeBucket(MINIO_BUCKET);
     console.log(`Created MinIO bucket: ${MINIO_BUCKET}`);
+    
+    // Set bucket policy to allow public read access
+    // This is needed for presigned URLs to work in browsers
+    const policy = {
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: { AWS: ["*"] },
+          Action: ["s3:GetObject"],
+          Resource: [`arn:aws:s3:::${MINIO_BUCKET}/*`],
+        },
+      ],
+    };
+    
+    try {
+      await minio.setBucketPolicy(MINIO_BUCKET, JSON.stringify(policy));
+      console.log(`Set public read policy for bucket: ${MINIO_BUCKET}`);
+    } catch (error) {
+      console.warn(`Failed to set bucket policy (may already exist):`, error);
+    }
   }
 }
 
@@ -146,13 +167,18 @@ export async function getSignedUrl(
 ): Promise<string> {
   const minio = getStorageClient();
 
-  const url = await minio.presignedGetObject(
-    MINIO_BUCKET,
-    objectName,
-    expirySeconds
-  );
+  try {
+    const url = await minio.presignedGetObject(
+      MINIO_BUCKET,
+      objectName,
+      expirySeconds
+    );
 
-  return url;
+    return url;
+  } catch (error) {
+    console.error(`[getSignedUrl] Failed to generate presigned URL for ${objectName}:`, error);
+    throw error;
+  }
 }
 
 /**

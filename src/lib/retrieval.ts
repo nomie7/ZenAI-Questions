@@ -1,5 +1,5 @@
 import { embedText } from "./embeddings";
-import { searchVectors } from "./qdrant";
+import { searchVectors, queryHybrid } from "./qdrant";
 import { getSignedUrl } from "./storage";
 
 export interface RetrievedChunk {
@@ -44,8 +44,8 @@ export async function retrieveContext(
     diversityWeight = 0.7,
   } = options;
 
-  // Generate query embedding
-  const queryEmbedding = await embedText(query);
+  // Generate dense query embedding
+  const queryDense = await embedText(query);
 
   // Build filter
   const filter: Record<string, unknown> = {
@@ -62,21 +62,42 @@ export async function retrieveContext(
   // Retrieve more candidates if we're going to diversify
   const candidateCount = diversify ? topK * 3 : topK;
 
-  // Search Qdrant
-  const results = await searchVectors(queryEmbedding, candidateCount, filter);
+  // Hybrid search with BM25 inference (Qdrant generates sparse vectors server-side)
+  let chunks: RetrievedChunk[] = [];
+  try {
+    const hybridResults = await queryHybrid({
+      denseVector: queryDense,
+      queryText: query, // Qdrant will generate BM25 sparse vector from this
+      limit: candidateCount,
+      filter,
+    });
 
-  // Map results to chunks
-  let chunks: RetrievedChunk[] = results.map((r) => ({
-    chunkId: r.id,
-    docId: (r.payload.doc_id as string) || "",
-    docName: (r.payload.doc_name as string) || "",
-    pageNumber: (r.payload.page_number as number) || 0,
-    chunkIndex: (r.payload.chunk_index as number) || 0,
-    text: (r.payload.text as string) || "",
-    imageUrl: (r.payload.image_url as string) || "",
-    score: r.score,
-    parserUsed: (r.payload.parser_used as string) || "",
-  }));
+    chunks = hybridResults.map((r) => ({
+      chunkId: r.id,
+      docId: (r.payload.doc_id as string) || "",
+      docName: (r.payload.doc_name as string) || "",
+      pageNumber: (r.payload.page_number as number) || 0,
+      chunkIndex: (r.payload.chunk_index as number) || 0,
+      text: (r.payload.text as string) || "",
+      imageUrl: (r.payload.image_url as string) || "",
+      score: r.score,
+      parserUsed: (r.payload.parser_used as string) || "",
+    }));
+  } catch (err) {
+    console.warn("Hybrid query failed, falling back to dense-only", err);
+    const denseResults = await searchVectors(queryDense, candidateCount, filter);
+    chunks = denseResults.map((r) => ({
+      chunkId: r.id,
+      docId: (r.payload.doc_id as string) || "",
+      docName: (r.payload.doc_name as string) || "",
+      pageNumber: (r.payload.page_number as number) || 0,
+      chunkIndex: (r.payload.chunk_index as number) || 0,
+      text: (r.payload.text as string) || "",
+      imageUrl: (r.payload.image_url as string) || "",
+      score: r.score,
+      parserUsed: (r.payload.parser_used as string) || "",
+    }));
+  }
 
   // Apply MMR diversification if enabled
   if (diversify && chunks.length > topK) {

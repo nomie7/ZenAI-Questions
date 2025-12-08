@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface StreamingTextProps {
   text: string;
@@ -66,6 +67,7 @@ export function StreamingText({
     <div className={cn("relative", className)}>
       <div className="prose prose-sm max-w-none">
         <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
           components={{
             // Style code blocks
             code: ({ children, className }) => {
@@ -96,6 +98,37 @@ export function StreamingText({
               <p className="mb-3 last:mb-0 leading-relaxed">
                 {children}
               </p>
+            ),
+            // Style tables
+            table: ({ children }) => (
+              <table className="min-w-full divide-y divide-gray-200 border border-gray-300 my-4">
+                {children}
+              </table>
+            ),
+            thead: ({ children }) => (
+              <thead className="bg-gray-50">
+                {children}
+              </thead>
+            ),
+            tbody: ({ children }) => (
+              <tbody className="bg-white divide-y divide-gray-200">
+                {children}
+              </tbody>
+            ),
+            tr: ({ children }) => (
+              <tr>
+                {children}
+              </tr>
+            ),
+            th: ({ children }) => (
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 last:border-r-0">
+                {children}
+              </th>
+            ),
+            td: ({ children }) => (
+              <td className="px-4 py-2 text-sm text-gray-900 border-r border-gray-200 last:border-r-0">
+                {children}
+              </td>
             ),
           }}
         >

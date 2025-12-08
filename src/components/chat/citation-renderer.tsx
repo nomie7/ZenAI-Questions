@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { type ComponentsMap } from "@copilotkit/react-ui";
 import {
   Dialog,
@@ -13,7 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, ZoomIn, X } from "lucide-react";
+import { FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ImageViewer } from "./image-viewer";
 
@@ -51,13 +51,28 @@ function CitationBadge({
   children,
 }: CitationProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isFullScreen, setIsFullScreen] = useState(false);
+  
+  // Get image URL from cache synchronously
+  const [fetchedImageUrl, setFetchedImageUrl] = useState<string | undefined>(imageUrl);
 
-  // Debug: Log props to see what LLM is passing
-  console.log('[CitationBadge] Props:', { docName, pageNumber, imageUrl: imageUrl || '(empty)', hasFullText: !!fullText });
+  // Fetch image URL when modal opens
+  useEffect(() => {
+    if (!isOpen || fetchedImageUrl) return;
+
+    // Simple synchronous fetch
+    fetch(`/api/citation-image?docName=${encodeURIComponent(docName)}&pageNumber=${pageNumber}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.imageUrl) {
+          setFetchedImageUrl(data.imageUrl);
+        }
+      })
+      .catch(err => console.error('Failed to load image:', err));
+  }, [isOpen, docName, pageNumber, fetchedImageUrl]);
 
   // Use fullText if available, otherwise fall back to snippet
   const displayText = fullText || snippet;
+  const displayImageUrl = fetchedImageUrl;
 
   return (
     <>
@@ -78,7 +93,7 @@ function CitationBadge({
 
       {/* Citation Detail Modal with Tabs */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogContent className="max-w-[95vw] w-full lg:max-w-7xl max-h-[95vh] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="px-6 py-4 border-b bg-gray-50 shrink-0">
             <DialogTitle className="flex items-center gap-2 text-lg">
               <FileText className="w-5 h-5 text-blue-600" />
@@ -125,9 +140,9 @@ function CitationBadge({
 
             {/* Image Tab */}
             <TabsContent value="image" className="flex-1 px-6 pb-6 mt-2 overflow-auto">
-              {imageUrl ? (
+              {displayImageUrl ? (
                 <ImageViewer
-                  imageUrl={imageUrl}
+                  imageUrl={displayImageUrl}
                   alt={`Page ${pageNumber} of ${docName}`}
                   docName={docName}
                   pageNumber={pageNumber}
@@ -171,13 +186,13 @@ function CitationBadge({
                 )}
 
                 {/* Image Section */}
-                {imageUrl && (
+                {displayImageUrl && (
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 mb-2">
                       Page Image
                     </h3>
                     <ImageViewer
-                      imageUrl={imageUrl}
+                      imageUrl={displayImageUrl}
                       alt={`Page ${pageNumber} of ${docName}`}
                       docName={docName}
                       pageNumber={pageNumber}
@@ -189,7 +204,7 @@ function CitationBadge({
                 )}
 
                 {/* No content fallback */}
-                {!displayText && !imageUrl && (
+                {!displayText && !displayImageUrl && (
                   <div className="text-center py-8 text-gray-400">
                     <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">No content available</p>
@@ -200,49 +215,11 @@ function CitationBadge({
           </Tabs>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t bg-gray-50 flex items-center justify-between gap-2 shrink-0">
+          <div className="px-6 py-4 border-t bg-gray-50 flex items-center justify-end gap-2 shrink-0">
             <Button variant="outline" size="sm" onClick={() => setIsOpen(false)}>
               Close
             </Button>
-            {imageUrl && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => setIsFullScreen(true)}
-              >
-                <ZoomIn className="w-4 h-4 mr-1" />
-                Full Screen
-              </Button>
-            )}
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Full-screen image modal */}
-      <Dialog open={isFullScreen} onOpenChange={setIsFullScreen}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] p-4 overflow-hidden">
-          <DialogDescription className="sr-only">
-            Full screen view of page {pageNumber} from {docName}
-          </DialogDescription>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-4 right-4 z-10 bg-white/80 hover:bg-white shadow-lg"
-            onClick={() => setIsFullScreen(false)}
-          >
-            <X className="w-5 h-5" />
-          </Button>
-          <ScrollArea className="w-full h-[90vh]">
-            <ImageViewer
-              imageUrl={imageUrl || ""}
-              alt={`Page ${pageNumber} of ${docName}`}
-              docName={docName}
-              pageNumber={pageNumber}
-              showControls={true}
-              enableZoom={true}
-              enableDownload={true}
-            />
-          </ScrollArea>
         </DialogContent>
       </Dialog>
     </>
@@ -271,17 +248,12 @@ export function createCitationTagRenderers(): ComponentsMap<{
       if (typeof children === 'string') {
         contentString = children;
       } else if (Array.isArray(children)) {
-        // react-markdown may convert URLs to link elements
-        // We need to extract the actual URL from link elements
         contentString = children.map(child => {
           if (typeof child === 'string') {
             return child;
           } else if (child && typeof child === 'object' && 'props' in child) {
-            // It's a React element - likely a link
-            // For links, get the href (the actual URL) instead of the link text
             const href = child.props?.href;
             const childText = child.props?.children;
-            // Use href if available (it's the actual URL), otherwise use the text
             return href || childText || '';
           }
           return '';
@@ -290,47 +262,33 @@ export function createCitationTagRenderers(): ComponentsMap<{
         contentString = String(children);
       }
 
-      console.log('[Citation Parser] Extracted content:', contentString);
-
       // URL-decode the content to handle %7C encoded pipes
       const decodedContent = decodeURIComponent(contentString);
-      console.log('[Citation Parser] Decoded content:', decodedContent);
 
-      // Parse pipe-delimited format: index|docName|pageNumber|imageUrl|text
+      // Parse pipe-delimited format: index|docName|pageNumber|text
       const parts = decodedContent.split('|');
 
       let index = '?';
       let docName = 'Document';
       let pageNumber = '?';
-      let imageUrl: string | undefined = undefined;
       let text: string | undefined = undefined;
 
-      if (parts.length >= 5) {
+      if (parts.length >= 4) {
         index = parts[0].trim();
         docName = parts[1].trim();
         pageNumber = parts[2].trim();
-        imageUrl = parts[3].trim();
         // Remaining parts join back together (in case text had pipes)
-        text = parts.slice(4).join('|').trim();
+        text = parts.slice(3).join('|').trim();
       } else {
-        console.warn('[Citation Parser] Invalid format, expected 5 parts, got:', parts.length);
+        console.warn('[Citation Parser] Invalid format, expected 4 parts, got:', parts.length);
         // Fallback
         text = decodedContent;
       }
-
-      console.log('[Citation Parser] Parsed values:', {
-        index,
-        docName,
-        pageNumber,
-        imageUrl,
-        textLength: text?.length
-      });
 
       return (
         <CitationBadge
           docName={docName}
           pageNumber={pageNumber}
-          imageUrl={imageUrl}
           fullText={text}
         >
           [{index}]

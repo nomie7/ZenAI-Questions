@@ -7,6 +7,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
 import { NextRequest } from "next/server";
 import { extractCitations } from "@/lib/retrieval";
+import { citationImageCache } from "@/lib/citation-cache";
 import {
   agenticRetrieve,
   formatAgentContextForLLM,
@@ -125,7 +126,14 @@ const runtime = new CopilotRuntime({
             lastAgentMetadata = getAgentMetadata(agentResult);
             lastCitations = await extractCitations(agentResult.chunks);
 
-            console.log(`[RAG Action] Search complete. Confidence: ${agentResult.finalConfidence.toFixed(2)}, Chunks: ${agentResult.chunks.length}`);
+            // Store citation images in cache for UI lookup
+            citationImageCache.clear();
+            lastCitations.forEach(citation => {
+              if (citation.imageUrl) {
+                const key = `${citation.docName}|${citation.pageNumber}`;
+                citationImageCache.set(key, citation.imageUrl);
+              }
+            });
 
             // Return structured result for the LLM
             return {
@@ -135,7 +143,7 @@ const runtime = new CopilotRuntime({
               searchQueries: agentResult.searchQueries,
               intent: agentResult.queryAnalysis.intent,
               context: contextText,
-              citationInstructions: `When citing information, use this format: <citation docName="DocumentName.pdf" pageNumber="X" snippet="relevant text...">N</citation> where N is a sequential number.`,
+              citationInstructions: `When citing information, use this format: <citation docName="DocumentName.pdf" pageNumber="X" snippet="relevant text...">N</citation> where N is a sequential number. The UI will automatically add page images.`,
             };
           } catch (error) {
             console.error("[RAG Action] Search failed:", error);

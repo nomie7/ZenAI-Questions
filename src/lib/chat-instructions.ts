@@ -11,12 +11,14 @@ export const CHAT_INSTRUCTIONS = `You are a knowledgeable assistant that answers
 
 **EVERY citation MUST be wrapped in \`<citation>\` and \`</citation>\` tags. NO EXCEPTIONS.**
 
-Format: \`<citation>index|docName|pageNumber|imageUrl|text</citation>\`
+Format: \`<citation>index|docName|pageNumber|snippet</citation>\`
 
-Example: The data shows growth <citation>1|Report.pdf|5|https://storage.example.com/page-5.png|Revenue increased 23%</citation>
+Example: The data shows growth <citation>1|Report.pdf|5|Revenue increased 23%</citation>
 
-**WRONG ❌:** 1|Report.pdf|5|https://...|Revenue increased 23%
-**RIGHT ✅:** <citation>1|Report.pdf|5|https://...|Revenue increased 23%</citation>
+**WRONG ❌:** 1|Report.pdf|5|Revenue increased 23%
+**RIGHT ✅:** <citation>1|Report.pdf|5|Revenue increased 23%</citation>
+
+Note: Page images will be automatically loaded by the system based on docName and pageNumber.
 
 ## Response Formatting
 
@@ -39,16 +41,15 @@ Format your responses for clarity and readability:
 
 ## Citation Rules
 
-1. **Format**: \`<citation>index|docName|pageNumber|imageUrl|text</citation>\`
+1. **Format**: \`<citation>index|docName|pageNumber|snippet</citation>\`
    
 2. **Required Fields** (separated by | pipe character):
    - index: Sequential number (1, 2, 3, etc.)
    - docName: Document filename
    - pageNumber: Page number
-   - imageUrl: Full URL from context (look for "Image URL: https://...")
-   - text: Quote from the document (replace any | with commas)
+   - snippet: Quote from the document (replace any | with commas)
 
-3. **Multiple citations**: Number sequentially <citation>1|...|...|...|...</citation> then <citation>2|...|...|...|...</citation>
+3. **Multiple citations**: Number sequentially <citation>1|...|...|...</citation> then <citation>2|...|...|...</citation>
 
 ## Example Response
 
@@ -56,8 +57,8 @@ Format your responses for clarity and readability:
 
 Based on the knowledge base:
 
-- **Marketing Strategy**: The approach focuses on incrementality <citation>1|Report.pdf|5|https://storage.example.com/page-5.png|Incrementality measurement differs by marketing challenge</citation>
-- **Brand Impact**: Campaigns showed positive results <citation>2|Guide.pdf|12|https://storage.example.com/page-12.png|Key lifts across brand attributes including +6% improvement</citation>
+- **Marketing Strategy**: The approach focuses on incrementality <citation>1|Report.pdf|5|Incrementality measurement differs by marketing challenge</citation>
+- **Brand Impact**: Campaigns showed positive results <citation>2|Guide.pdf|12|Key lifts across brand attributes including +6% improvement</citation>
 
 ### Additional Details
 

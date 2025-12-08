@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
     "sharp",
     "minio",
     "pdf-to-img",
+    "fastembed",
+    "@anush008/tokenizers",
+    "onnxruntime-node",
   ],
   // Configure experimental features
   experimental: {

@@ -365,52 +365,23 @@ export async function formatAgentContextForLLM(result: AgentRetrievalResult): Pr
     return "No relevant documents found in the knowledge base.";
   }
 
-  // Import getSignedUrl here to avoid circular dependencies
-  const { getSignedUrl } = await import("./storage");
+  // Limit to top 8 chunks to reduce payload size
+  const topChunks = result.chunks.slice(0, 8);
 
-  console.log(`[formatAgentContextForLLM] Processing ${result.chunks.length} chunks for signed URLs...`);
-
-  // Generate signed URLs for all images in parallel
-  const contextBlocksPromises = result.chunks.map(async (chunk, index) => {
-    let signedImageUrl = "";
-
-    // Convert MinIO object path to signed URL
-    if (chunk.imageUrl) {
-      try {
-        const rawUrl = await getSignedUrl(chunk.imageUrl, 3600); // 1 hour expiry
-        // Ensure it's a string (in case MinIO returns an object)
-        signedImageUrl = typeof rawUrl === 'string' ? rawUrl : String(rawUrl);
-        console.log(`[formatAgentContextForLLM] Chunk ${index + 1}: Generated signed URL (${signedImageUrl.substring(0, 60)}...)`);
-      } catch (error) {
-        console.warn(`[formatAgentContextForLLM] Failed to generate signed URL for ${chunk.imageUrl}:`, error);
-      }
-    } else {
-      console.warn(`[formatAgentContextForLLM] Chunk ${index + 1}: NO imageUrl in chunk`);
-    }
-
-    // Include signed URL in context so LLM can use it in citations
-    const imageInfo = signedImageUrl ? `\nImage URL: ${signedImageUrl}` : "";
-    return `[${index + 1}] Document: "${chunk.docName}", Page ${chunk.pageNumber}${imageInfo}
-${chunk.text}`;
+  // Don't include image URLs in context to reduce payload size
+  // They will be fetched from citations API instead
+  const contextBlocks = topChunks.map((chunk, index) => {
+    // Truncate text to reduce payload size (keep first 400 chars + ellipsis if longer)
+    const truncatedText = chunk.text.length > 400 
+      ? chunk.text.substring(0, 400) + "..." 
+      : chunk.text;
+    return `[${index + 1}] Document: "${chunk.docName}", Page ${chunk.pageNumber}
+${truncatedText}`;
   });
 
-  const contextBlocks = await Promise.all(contextBlocksPromises);
-
-  const searchInfo = `Search conducted with ${result.iterations} iteration(s), ${result.searchQueries.length} queries, confidence ${result.finalConfidence.toFixed(2)}`;
+  const searchInfo = `Search conducted with ${result.iterations} iteration(s), ${result.searchQueries.length} queries, confidence ${result.finalConfidence.toFixed(2)}. Showing top ${topChunks.length} results.`;
 
   const finalContext = `${searchInfo}\n\n---\n\n${contextBlocks.join("\n\n---\n\n")}`;
-
-  // Log a preview to verify Image URLs are in the context
-  const imageUrlCount = (finalContext.match(/Image URL: https/g) || []).length;
-  console.log(`[formatAgentContextForLLM] Context formatted. Contains ${imageUrlCount} signed image URLs`);
-
-  // Debug: Log a snippet of the context to see the Image URL format
-  const imageUrlMatch = finalContext.match(/Image URL: ([^\n]+)/);
-  if (imageUrlMatch) {
-    console.log(`[formatAgentContextForLLM] Sample Image URL in context: ${imageUrlMatch[1].substring(0, 80)}...`);
-  } else {
-    console.log(`[formatAgentContextForLLM] WARNING: No Image URL found in context!`);
-  }
 
   return finalContext;
 }
