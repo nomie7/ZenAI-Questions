@@ -12,7 +12,6 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton";
 import { FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ImageViewer } from "./image-viewer";
@@ -40,7 +39,7 @@ interface CitationProps {
  * Inline Citation Badge Component
  *
  * Renders a clickable citation badge that opens a modal
- * with tabbed views: Text, Image, and Both.
+ * with tabbed views: Text and Image.
  */
 function CitationBadge({
   docName = "Document",
@@ -51,7 +50,7 @@ function CitationBadge({
   children,
 }: CitationProps) {
   const [isOpen, setIsOpen] = useState(false);
-  
+
   // Get image URL from cache synchronously
   const [fetchedImageUrl, setFetchedImageUrl] = useState<string | undefined>(imageUrl);
 
@@ -104,22 +103,23 @@ function CitationBadge({
             </DialogDescription>
           </DialogHeader>
 
-          <Tabs defaultValue="both" className="flex-1 flex flex-col min-h-0">
+          <Tabs defaultValue="image" className="flex-1 flex flex-col min-h-0">
             <TabsList className="mx-6 mt-4 shrink-0">
               <TabsTrigger value="text">Text</TabsTrigger>
               <TabsTrigger value="image">Image</TabsTrigger>
-              <TabsTrigger value="both">Both</TabsTrigger>
             </TabsList>
 
             {/* Text Tab */}
             <TabsContent value="text" className="flex-1 px-6 pb-6 mt-2 overflow-auto">
               {displayText ? (
                 <div className="space-y-4">
-                  <div className="bg-amber-50 border-l-4 border-amber-400 rounded-r-lg p-4">
-                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                      {displayText}
-                    </p>
-                  </div>
+                  <ScrollArea className="max-h-[60vh] rounded-lg border bg-amber-50 border-amber-200">
+                    <div className="p-4">
+                      <p className="text-base text-gray-800 leading-relaxed whitespace-pre-wrap break-words">
+                        {displayText}
+                      </p>
+                    </div>
+                  </ScrollArea>
                   <Button
                     variant="outline"
                     size="sm"
@@ -156,61 +156,6 @@ function CitationBadge({
                   <p className="text-sm">No image available</p>
                 </div>
               )}
-            </TabsContent>
-
-            {/* Both Tab */}
-            <TabsContent value="both" className="flex-1 px-6 pb-6 mt-2 overflow-auto">
-              <div className="space-y-6">
-                {/* Text Section */}
-                {displayText && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">
-                      Chunk Text
-                    </h3>
-                    <div className="bg-amber-50 border-l-4 border-amber-400 rounded-r-lg p-4">
-                      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                        {displayText}
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2"
-                      onClick={() => {
-                        navigator.clipboard.writeText(displayText);
-                      }}
-                    >
-                      Copy Text
-                    </Button>
-                  </div>
-                )}
-
-                {/* Image Section */}
-                {displayImageUrl && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">
-                      Page Image
-                    </h3>
-                    <ImageViewer
-                      imageUrl={displayImageUrl}
-                      alt={`Page ${pageNumber} of ${docName}`}
-                      docName={docName}
-                      pageNumber={pageNumber}
-                      showControls={true}
-                      enableZoom={true}
-                      enableDownload={true}
-                    />
-                  </div>
-                )}
-
-                {/* No content fallback */}
-                {!displayText && !displayImageUrl && (
-                  <div className="text-center py-8 text-gray-400">
-                    <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No content available</p>
-                  </div>
-                )}
-              </div>
             </TabsContent>
           </Tabs>
 

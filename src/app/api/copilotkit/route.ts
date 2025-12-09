@@ -143,7 +143,7 @@ const runtime = new CopilotRuntime({
               searchQueries: agentResult.searchQueries,
               intent: agentResult.queryAnalysis.intent,
               context: contextText,
-              citationInstructions: `When citing information, use this format: <citation docName="DocumentName.pdf" pageNumber="X" snippet="relevant text...">N</citation> where N is a sequential number. The UI will automatically add page images.`,
+              citationInstructions: `When citing information, include the full chunk text (not a shortened snippet). Use this format: <citation docName="DocumentName.pdf" pageNumber="X" text="full chunk text here">N</citation> where N is a sequential number. The UI will automatically add page images.`,
             };
           } catch (error) {
             console.error("[RAG Action] Search failed:", error);

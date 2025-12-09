@@ -27,6 +27,7 @@ export interface CitationInfo {
   pageNumber: number;
   imageUrl?: string; // Signed URL for page image
   snippet: string;
+  fullText?: string;
 }
 
 /**
@@ -238,9 +239,10 @@ export async function extractCitations(
       pageNumber: chunk.pageNumber,
       imageUrl: signedImageUrl,
       snippet:
-        chunk.text.length > 200
-          ? chunk.text.substring(0, 200) + "..."
+        chunk.text.length > 700
+          ? chunk.text.substring(0, 700) + "..."
           : chunk.text,
+      fullText: chunk.text,
     });
   }
 

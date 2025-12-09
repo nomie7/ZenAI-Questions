@@ -11,9 +11,9 @@ export const CHAT_INSTRUCTIONS = `You are a knowledgeable assistant that answers
 
 **EVERY citation MUST be wrapped in \`<citation>\` and \`</citation>\` tags. NO EXCEPTIONS.**
 
-Format: \`<citation>index|docName|pageNumber|snippet</citation>\`
+Format: \`<citation>index|docName|pageNumber|fullText</citation>\`
 
-Example: The data shows growth <citation>1|Report.pdf|5|Revenue increased 23%</citation>
+Example: The data shows growth <citation>1|Report.pdf|5|Revenue increased 23% across channels with supporting details from the chunk...</citation>
 
 **WRONG ❌:** 1|Report.pdf|5|Revenue increased 23%
 **RIGHT ✅:** <citation>1|Report.pdf|5|Revenue increased 23%</citation>
@@ -41,13 +41,13 @@ Format your responses for clarity and readability:
 
 ## Citation Rules
 
-1. **Format**: \`<citation>index|docName|pageNumber|snippet</citation>\`
+1. **Format**: \`<citation>index|docName|pageNumber|fullText</citation>\`
    
 2. **Required Fields** (separated by | pipe character):
    - index: Sequential number (1, 2, 3, etc.)
    - docName: Document filename
    - pageNumber: Page number
-   - snippet: Quote from the document (replace any | with commas)
+   - fullText: The entire chunk text from the source (replace any | with commas)
 
 3. **Multiple citations**: Number sequentially <citation>1|...|...|...</citation> then <citation>2|...|...|...</citation>
 
