@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { CopilotChat } from "@copilotkit/react-ui";
 import { Button } from "@/components/ui/button";
 import { BookOpen, Settings, Sparkles } from "lucide-react";
@@ -8,6 +9,7 @@ import { CustomAssistantMessage, CustomUserMessage } from "@/components/chat/cus
 import { createCitationTagRenderers } from "@/components/chat/citation-renderer";
 import { SearchActionRenderer } from "@/components/chat/search-action-renderer";
 import { CHAT_INSTRUCTIONS, CHAT_LABELS } from "@/lib/chat-instructions";
+import { SimilarQuestionsPanel } from "@/components/pitch/similar-questions-panel";
 
 /**
  * Main chat page with full-width CopilotKit integration
@@ -19,6 +21,7 @@ import { CHAT_INSTRUCTIONS, CHAT_LABELS } from "@/lib/chat-instructions";
  * - Clean, modern chat interface
  */
 export default function Home() {
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
   const citationRenderers = createCitationTagRenderers();
 
   return (
@@ -31,12 +34,14 @@ export default function Home() {
             <h1 className="text-xl font-semibold">Knowledge Assistant</h1>
           </div>
           <nav className="flex items-center gap-2">
-            <Link href="/pitch-search">
-              <Button variant="outline" size="sm">
-                <Sparkles className="w-4 h-4 mr-2" />
-                Find Similar Questions
-              </Button>
-            </Link>
+            <Button
+              variant={isPanelOpen ? "default" : "outline"}
+              size="sm"
+              onClick={() => setIsPanelOpen(!isPanelOpen)}
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Find Similar Questions
+            </Button>
             <Link href="/knowledge">
               <Button variant="outline" size="sm">
                 <Settings className="w-4 h-4 mr-2" />
@@ -48,36 +53,50 @@ export default function Home() {
       </header>
 
       {/* Chat Content */}
-      <div className="flex-1 overflow-hidden">
-        {/* Register the search action renderer - must be inside CopilotKit context */}
-        <SearchActionRenderer />
+      <div className="flex-1 overflow-hidden flex">
+        {/* Main Chat Area */}
+        <div
+          className={`flex-1 flex flex-col ${
+            isPanelOpen ? "w-2/3" : "w-full"
+          } transition-all duration-300`}
+        >
+          {/* Register the search action renderer - must be inside CopilotKit context */}
+          <SearchActionRenderer />
 
-        <CopilotChat
-          instructions={CHAT_INSTRUCTIONS}
-          labels={CHAT_LABELS}
-          className="h-full"
-          UserMessage={CustomUserMessage}
-          AssistantMessage={CustomAssistantMessage}
-          markdownTagRenderers={citationRenderers}
-          onThumbsUp={(message) => {
-            console.log("Positive feedback for message:", message.id);
-            // TODO: Track positive feedback in analytics/database
-          }}
-          onThumbsDown={(message) => {
-            console.log("Negative feedback for message:", message.id);
-            // TODO: Track negative feedback in analytics/database
-          }}
-          onSubmitMessage={() => {
-            console.log("Message submitted");
-            // TODO: Track message submission analytics
-          }}
-          observabilityHooks={{
-            onMessageSent: (message) => {
-              console.log("Message sent:", message);
-              // TODO: Track message in analytics
-            },
-          }}
-        />
+          <CopilotChat
+            instructions={CHAT_INSTRUCTIONS}
+            labels={CHAT_LABELS}
+            className="h-full"
+            UserMessage={CustomUserMessage}
+            AssistantMessage={CustomAssistantMessage}
+            markdownTagRenderers={citationRenderers}
+            onThumbsUp={(message) => {
+              console.log("Positive feedback for message:", message.id);
+              // TODO: Track positive feedback in analytics/database
+            }}
+            onThumbsDown={(message) => {
+              console.log("Negative feedback for message:", message.id);
+              // TODO: Track negative feedback in analytics/database
+            }}
+            onSubmitMessage={() => {
+              console.log("Message submitted");
+              // TODO: Track message submission analytics
+            }}
+            observabilityHooks={{
+              onMessageSent: (message) => {
+                console.log("Message sent:", message);
+                // TODO: Track message in analytics
+              },
+            }}
+          />
+        </div>
+
+        {/* Similar Questions Side Panel */}
+        {isPanelOpen && (
+          <div className="w-1/3 h-full border-l bg-background">
+            <SimilarQuestionsPanel onClose={() => setIsPanelOpen(false)} />
+          </div>
+        )}
       </div>
     </main>
   );
