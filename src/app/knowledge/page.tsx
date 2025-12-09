@@ -15,13 +15,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { BookOpen, Plus, RefreshCw, ArrowLeft } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BookOpen, Plus, RefreshCw, ArrowLeft, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { UploadForm } from "@/components/knowledge/upload-form";
 import {
   DocumentTable,
   type Document,
 } from "@/components/knowledge/document-table";
+import { FeedbackTable } from "@/components/knowledge/feedback-table";
 
 export default function KnowledgePage() {
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -106,54 +108,86 @@ export default function KnowledgePage() {
       </header>
 
       <div className="container mx-auto py-6 px-4 max-w-7xl">
-        {/* Stats cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardHeader className="py-3">
-              <CardDescription>Total Documents</CardDescription>
-              <CardTitle className="text-2xl">{stats.total}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="py-3">
-              <CardDescription>Ready</CardDescription>
-              <CardTitle className="text-2xl text-green-600">
-                {stats.ready}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="py-3">
-              <CardDescription>Total Pages</CardDescription>
-              <CardTitle className="text-2xl">{stats.totalPages}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="py-3">
-              <CardDescription>Total Chunks</CardDescription>
-              <CardTitle className="text-2xl">{stats.totalChunks}</CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
+        {/* Tabs for Documents and Feedback */}
+        <Tabs defaultValue="documents" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="documents">
+              <BookOpen className="w-4 h-4 mr-2" />
+              Documents
+            </TabsTrigger>
+            <TabsTrigger value="feedback">
+              <MessageSquare className="w-4 h-4 mr-2" />
+              Feedback
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Document table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Documents</CardTitle>
-            <CardDescription>
-              Manage your knowledge base documents. Upload, replace, or delete
-              documents.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <DocumentTable
-              documents={documents}
-              isLoading={isLoading}
-              onReplace={handleReplace}
-              onDelete={handleDelete}
-            />
-          </CardContent>
-        </Card>
+          {/* Documents Tab */}
+          <TabsContent value="documents" className="space-y-6">
+            {/* Stats cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="py-3">
+                  <CardDescription>Total Documents</CardDescription>
+                  <CardTitle className="text-2xl">{stats.total}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="py-3">
+                  <CardDescription>Ready</CardDescription>
+                  <CardTitle className="text-2xl text-green-600">
+                    {stats.ready}
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="py-3">
+                  <CardDescription>Total Pages</CardDescription>
+                  <CardTitle className="text-2xl">{stats.totalPages}</CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="py-3">
+                  <CardDescription>Total Chunks</CardDescription>
+                  <CardTitle className="text-2xl">{stats.totalChunks}</CardTitle>
+                </CardHeader>
+              </Card>
+            </div>
+
+            {/* Document table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Documents</CardTitle>
+                <CardDescription>
+                  Manage your knowledge base documents. Upload, replace, or delete
+                  documents.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DocumentTable
+                  documents={documents}
+                  isLoading={isLoading}
+                  onReplace={handleReplace}
+                  onDelete={handleDelete}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Feedback Tab */}
+          <TabsContent value="feedback">
+            <Card>
+              <CardHeader>
+                <CardTitle>User Feedback</CardTitle>
+                <CardDescription>
+                  View all user feedback (thumbs up/down) for assistant responses.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FeedbackTable />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* Role/Auth placeholder */}
         <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">

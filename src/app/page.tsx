@@ -53,6 +53,24 @@ export default function Home() {
           UserMessage={CustomUserMessage}
           AssistantMessage={CustomAssistantMessage}
           markdownTagRenderers={citationRenderers}
+          onThumbsUp={(message) => {
+            console.log("Positive feedback for message:", message.id);
+            // TODO: Track positive feedback in analytics/database
+          }}
+          onThumbsDown={(message) => {
+            console.log("Negative feedback for message:", message.id);
+            // TODO: Track negative feedback in analytics/database
+          }}
+          onSubmitMessage={() => {
+            console.log("Message submitted");
+            // TODO: Track message submission analytics
+          }}
+          observabilityHooks={{
+            onMessageSent: (message) => {
+              console.log("Message sent:", message);
+              // TODO: Track message in analytics
+            },
+          }}
         />
       </div>
     </main>

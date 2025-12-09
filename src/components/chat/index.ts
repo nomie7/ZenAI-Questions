@@ -29,6 +29,9 @@ export {
   CustomUserMessage,
 } from "./custom-assistant-message";
 
+// Message action buttons (copy, regenerate, feedback)
+export { MessageActionButtons } from "./message-action-buttons";
+
 // Agent search action
 export {
   AgentSearchProgress,

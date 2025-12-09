@@ -5,7 +5,9 @@ import {
   type UserMessageProps,
   Markdown,
 } from "@copilotkit/react-ui";
+import { useCopilotChat } from "@copilotkit/react-core";
 import { Sparkles, Loader2 } from "lucide-react";
+import { MessageActionButtons } from "./message-action-buttons";
 
 /**
  * Custom Assistant Message component for CopilotKit
@@ -15,14 +17,31 @@ import { Sparkles, Loader2 } from "lucide-react";
  * - CopilotKit's Markdown component with markdownTagRenderers support
  * - Loading spinner during generation
  * - SubComponent/generativeUI support for tool outputs
+ * - Action buttons for feedback (thumbs up/down, copy, regenerate)
  */
 export function CustomAssistantMessage(props: AssistantMessageProps) {
   const { message, isLoading, subComponent, markdownTagRenderers } = props;
   const content = message?.content || "";
+  const { visibleMessages } = useCopilotChat();
 
-  // Debug: Log the raw message content to see what LLM is sending
-  console.log('[CustomAssistantMessage] Raw content:', content);
-  console.log('[CustomAssistantMessage] Has <citation> tags?', content.includes('<citation>'));
+  // Find the previous user message for this assistant message
+  const getPreviousUserMessage = (): string | undefined => {
+    if (!message?.id || !visibleMessages) return undefined;
+
+    const currentIndex = visibleMessages.findIndex((m) => m.id === message.id);
+    if (currentIndex <= 0) return undefined;
+
+    // Look backwards for the most recent user message
+    for (let i = currentIndex - 1; i >= 0; i--) {
+      const msg = visibleMessages[i];
+      if (msg.role === "user" && msg.content) {
+        return msg.content;
+      }
+    }
+    return undefined;
+  };
+
+  const userMessage = getPreviousUserMessage();
 
   // Get generativeUI if available (new way)
   const generativeUI = message?.generativeUI?.();
@@ -39,7 +58,7 @@ export function CustomAssistantMessage(props: AssistantMessageProps) {
   }
 
   return (
-    <div className="flex items-start gap-3 py-4 px-4">
+    <div className="group flex items-start gap-3 py-4 px-4">
       {/* Avatar */}
       <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-md">
         <Sparkles className="w-4 h-4 text-white" />
@@ -74,6 +93,15 @@ export function CustomAssistantMessage(props: AssistantMessageProps) {
           <div className="mt-3">
             {subComponent}
           </div>
+        )}
+
+        {/* Action buttons (copy, regenerate, thumbs up/down) - only show when not loading */}
+        {!isLoading && message?.id && content && (
+          <MessageActionButtons
+            messageId={message.id}
+            content={content}
+            userMessage={userMessage}
+          />
         )}
       </div>
     </div>
