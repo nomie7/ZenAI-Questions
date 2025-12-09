@@ -8,7 +8,6 @@ import {
   RefreshCw,
   Sparkles,
   CheckCircle2,
-  Circle,
   Loader2,
   FileText
 } from "lucide-react";
@@ -29,145 +28,219 @@ interface AgentActivityProps {
   className?: string;
 }
 
-const statusConfig = {
-  idle: {
-    icon: Circle,
-    label: "Ready",
-    color: "text-gray-400",
-    bgColor: "bg-gray-50",
-  },
-  analyzing: {
-    icon: Brain,
-    label: "Analyzing question...",
-    color: "text-purple-600",
-    bgColor: "bg-purple-50",
-  },
-  searching: {
-    icon: Search,
-    label: "Searching knowledge base...",
-    color: "text-blue-600",
-    bgColor: "bg-blue-50",
-  },
-  reflecting: {
-    icon: Sparkles,
-    label: "Evaluating results...",
-    color: "text-amber-600",
-    bgColor: "bg-amber-50",
-  },
-  refining: {
-    icon: RefreshCw,
-    label: "Refining search...",
-    color: "text-orange-600",
-    bgColor: "bg-orange-50",
-  },
-  generating: {
-    icon: FileText,
-    label: "Generating response...",
-    color: "text-green-600",
-    bgColor: "bg-green-50",
-  },
-};
+const stages = [
+  { key: "analyzing", icon: Brain, label: "Analyzing" },
+  { key: "searching", icon: Search, label: "Searching" },
+  { key: "reflecting", icon: Sparkles, label: "Reflecting" },
+  { key: "refining", icon: RefreshCw, label: "Refining" },
+  { key: "generating", icon: FileText, label: "Generating" },
+] as const;
 
-export function AgentActivityIndicator({ state, className }: AgentActivityProps) {
-  const config = statusConfig[state.status] || statusConfig.idle;
-  const Icon = config.icon;
+type StageKey = typeof stages[number]["key"];
 
-  if (state.status === "idle") {
-    return null;
-  }
+function getStageStatus(
+  currentStatus: AgentState["status"],
+  stageKey: StageKey
+): "complete" | "active" | "pending" {
+  if (currentStatus === "idle") return "pending";
+
+  const currentIndex = stages.findIndex(s => s.key === currentStatus);
+  const stageIndex = stages.findIndex(s => s.key === stageKey);
+
+  if (stageIndex < currentIndex) return "complete";
+  if (stageIndex === currentIndex) return "active";
+  return "pending";
+}
+
+interface StageItemProps {
+  stage: typeof stages[number];
+  status: "complete" | "active" | "pending";
+  isLast: boolean;
+}
+
+function StageItem({ stage, status, isLast }: StageItemProps) {
+  const Icon = stage.icon;
 
   return (
-    <div className={cn(
-      "rounded-lg border p-3 space-y-3",
-      config.bgColor,
-      className
-    )}>
-      {/* Current status */}
-      <div className="flex items-center gap-2">
-        <Loader2 className={cn("w-4 h-4 animate-spin", config.color)} />
-        <span className={cn("text-sm font-medium", config.color)}>
-          {config.label}
-        </span>
-        {state.iteration && state.maxIterations && (
-          <span className="text-xs text-gray-500 ml-auto">
-            Iteration {state.iteration}/{state.maxIterations}
-          </span>
-        )}
+    <div className="flex items-center flex-1">
+      <div className="flex flex-col items-center flex-1">
+        {/* Stage circle */}
+        <div
+          className={cn(
+            "relative flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all duration-300",
+            status === "complete" && "bg-gray-100 border-gray-300",
+            status === "active" && "bg-blue-50 border-blue-600 shadow-sm",
+            status === "pending" && "bg-white border-gray-200"
+          )}
+        >
+          {status === "complete" && (
+            <CheckCircle2 className="w-4 h-4 text-gray-600" />
+          )}
+          {status === "active" && (
+            <>
+              <Icon className="w-4 h-4 text-blue-600" />
+              <span className="absolute inset-0 rounded-full bg-blue-600/20 animate-pulse" />
+            </>
+          )}
+          {status === "pending" && (
+            <Icon className="w-4 h-4 text-gray-400" />
+          )}
+        </div>
+
+        {/* Stage label */}
+        <div className="mt-2 text-center">
+          <div
+            className={cn(
+              "text-xs font-medium transition-colors duration-300",
+              status === "active" && "text-blue-600",
+              status === "complete" && "text-gray-600",
+              status === "pending" && "text-gray-400"
+            )}
+          >
+            {stage.label}
+          </div>
+        </div>
       </div>
 
-      {/* Current query being searched */}
+      {/* Connector line */}
+      {!isLast && (
+        <div className="flex-1 h-0.5 mx-2 -mt-4">
+          <div
+            className={cn(
+              "h-full transition-all duration-300",
+              status === "complete" ? "bg-gray-300" : "bg-gray-200"
+            )}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StageTimeline({ currentStatus }: { currentStatus: AgentState["status"] }) {
+  return (
+    <div className="flex items-start px-2 py-4">
+      {stages.map((stage, index) => (
+        <StageItem
+          key={stage.key}
+          stage={stage}
+          status={getStageStatus(currentStatus, stage.key)}
+          isLast={index === stages.length - 1}
+        />
+      ))}
+    </div>
+  );
+}
+
+function DetailsPanel({ state }: { state: AgentState }) {
+  const hasDetails =
+    state.currentQuery ||
+    state.intent ||
+    (state.searches && state.searches.length > 0) ||
+    (state.confidence !== undefined && state.confidence > 0) ||
+    (state.missingInfo && state.missingInfo.length > 0);
+
+  if (!hasDetails) return null;
+
+  return (
+    <div className="border-t border-gray-200 pt-3 space-y-3">
+      {/* Current query */}
       {state.currentQuery && state.status === "searching" && (
-        <div className="text-xs text-gray-600 bg-white/60 rounded px-2 py-1.5 font-mono">
-          "{state.currentQuery}"
+        <div className="text-xs">
+          <div className="text-gray-500 mb-1 font-medium">Current Query</div>
+          <div className="text-gray-700 bg-gray-50 rounded px-2 py-1.5 font-mono border border-gray-200">
+            "{state.currentQuery}"
+          </div>
         </div>
       )}
 
-      {/* Intent display */}
+      {/* Intent */}
       {state.intent && state.status === "analyzing" && (
-        <div className="text-xs text-gray-600">
-          <span className="font-medium">Understanding: </span>
-          {state.intent}
+        <div className="text-xs">
+          <div className="text-gray-500 mb-1 font-medium">Understanding</div>
+          <div className="text-gray-700">{state.intent}</div>
         </div>
       )}
 
       {/* Search history */}
       {state.searches && state.searches.length > 0 && (
-        <div className="space-y-1">
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-            Search Progress
+        <div className="text-xs">
+          <div className="text-gray-500 mb-1.5 font-medium">Search Progress</div>
+          <div className="space-y-1">
+            {state.searches.map((search, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "flex items-center gap-2 py-1",
+                  search.done ? "text-gray-500" : "text-gray-700"
+                )}
+              >
+                {search.done ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                ) : (
+                  <Loader2 className="w-3.5 h-3.5 text-blue-600 animate-spin flex-shrink-0" />
+                )}
+                <span className="truncate">{search.query}</span>
+              </div>
+            ))}
           </div>
-          {state.searches.map((search, i) => (
-            <div
-              key={i}
-              className={cn(
-                "text-xs flex items-center gap-1.5 py-0.5",
-                search.done ? "text-gray-500" : "text-gray-700"
-              )}
-            >
-              {search.done ? (
-                <CheckCircle2 className="w-3 h-3 text-green-500 flex-shrink-0" />
-              ) : (
-                <Loader2 className="w-3 h-3 text-blue-500 animate-spin flex-shrink-0" />
-              )}
-              <span className="truncate">{search.query}</span>
-            </div>
-          ))}
         </div>
       )}
 
       {/* Confidence meter */}
       {state.confidence !== undefined && state.confidence > 0 && (
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-500">Confidence</span>
-            <span className={cn(
-              "font-medium",
-              state.confidence >= 0.7 ? "text-green-600" :
-              state.confidence >= 0.5 ? "text-amber-600" : "text-red-500"
-            )}>
+        <div className="text-xs space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-gray-500 font-medium">Confidence</span>
+            <span className="text-gray-700 font-medium">
               {Math.round(state.confidence * 100)}%
             </span>
           </div>
           <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
             <div
-              className={cn(
-                "h-full transition-all duration-500 rounded-full",
-                state.confidence >= 0.7 ? "bg-green-500" :
-                state.confidence >= 0.5 ? "bg-amber-500" : "bg-red-400"
-              )}
+              className="h-full bg-gray-400 transition-all duration-500 rounded-full"
               style={{ width: `${state.confidence * 100}%` }}
             />
           </div>
         </div>
       )}
 
-      {/* Missing information (during refining) */}
+      {/* Missing information */}
       {state.missingInfo && state.missingInfo.length > 0 && state.status === "refining" && (
-        <div className="text-xs text-orange-700 bg-orange-100/50 rounded p-2">
-          <span className="font-medium">Looking for: </span>
-          {state.missingInfo.join(", ")}
+        <div className="text-xs">
+          <div className="text-gray-500 mb-1 font-medium">Looking for</div>
+          <div className="text-gray-700 bg-gray-50 rounded px-2 py-1.5 border border-gray-200">
+            {state.missingInfo.join(", ")}
+          </div>
         </div>
       )}
+
+      {/* Iteration info */}
+      {state.iteration && state.maxIterations && (
+        <div className="text-xs text-gray-500">
+          Iteration {state.iteration} of {state.maxIterations}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function AgentActivityIndicator({ state, className }: AgentActivityProps) {
+  if (state.status === "idle") {
+    return null;
+  }
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden",
+        className
+      )}
+    >
+      <div className="p-4">
+        <StageTimeline currentStatus={state.status} />
+        <DetailsPanel state={state} />
+      </div>
     </div>
   );
 }
@@ -188,36 +261,44 @@ export function useSimulatedAgentActivity(isLoading: boolean): AgentState {
     // Simulate activity phases
     const phases: { time: number; state: AgentState }[] = [
       { time: 0, state: { status: "analyzing", intent: "Understanding your question..." } },
-      { time: 800, state: {
-        status: "searching",
-        currentQuery: "initial search",
-        iteration: 1,
-        maxIterations: 3,
-        searches: [{ query: "Searching knowledge base...", done: false }]
-      }},
-      { time: 2500, state: {
-        status: "reflecting",
-        confidence: 0.5,
-        searches: [{ query: "Initial search", done: true }]
-      }},
-      { time: 3500, state: {
-        status: "refining",
-        iteration: 2,
-        maxIterations: 3,
-        confidence: 0.6,
-        searches: [
-          { query: "Initial search", done: true },
-          { query: "Refining with related terms...", done: false }
-        ]
-      }},
-      { time: 5000, state: {
-        status: "generating",
-        confidence: 0.85,
-        searches: [
-          { query: "Initial search", done: true },
-          { query: "Related terms search", done: true }
-        ]
-      }},
+      {
+        time: 800, state: {
+          status: "searching",
+          currentQuery: "initial search",
+          iteration: 1,
+          maxIterations: 3,
+          searches: [{ query: "Searching knowledge base...", done: false }]
+        }
+      },
+      {
+        time: 2500, state: {
+          status: "reflecting",
+          confidence: 0.5,
+          searches: [{ query: "Initial search", done: true }]
+        }
+      },
+      {
+        time: 3500, state: {
+          status: "refining",
+          iteration: 2,
+          maxIterations: 3,
+          confidence: 0.6,
+          searches: [
+            { query: "Initial search", done: true },
+            { query: "Refining with related terms...", done: false }
+          ]
+        }
+      },
+      {
+        time: 5000, state: {
+          status: "generating",
+          confidence: 0.85,
+          searches: [
+            { query: "Initial search", done: true },
+            { query: "Related terms search", done: true }
+          ]
+        }
+      },
     ];
 
     const timeouts = phases.map(({ time, state: newState }) =>
@@ -234,7 +315,14 @@ export function useSimulatedAgentActivity(isLoading: boolean): AgentState {
  * Compact inline version for chat messages
  */
 export function AgentActivityInline({ state }: { state: AgentState }) {
-  const config = statusConfig[state.status] || statusConfig.idle;
+  const stageLabels: Record<AgentState["status"], string> = {
+    idle: "Ready",
+    analyzing: "Analyzing question...",
+    searching: "Searching knowledge base...",
+    reflecting: "Evaluating results...",
+    refining: "Refining search...",
+    generating: "Generating response...",
+  };
 
   if (state.status === "idle") return null;
 
@@ -244,12 +332,12 @@ export function AgentActivityInline({ state }: { state: AgentState }) {
         {[0, 1, 2].map((i) => (
           <div
             key={i}
-            className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"
+            className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce"
             style={{ animationDelay: `${i * 150}ms` }}
           />
         ))}
       </div>
-      <span className={config.color}>{config.label}</span>
+      <span className="text-gray-700">{stageLabels[state.status]}</span>
       {state.currentQuery && (
         <span className="text-gray-400 text-xs truncate max-w-[200px]">
           "{state.currentQuery}"

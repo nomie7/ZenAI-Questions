@@ -47,13 +47,14 @@ const statusLabels = {
   complete: "Complete",
 };
 
+// Neutral color scheme - using grays with subtle blue accent for active elements
 const statusColors = {
-  analyzing: "text-purple-600 bg-purple-50 border-purple-200",
-  searching: "text-blue-600 bg-blue-50 border-blue-200",
-  reflecting: "text-amber-600 bg-amber-50 border-amber-200",
-  refining: "text-orange-600 bg-orange-50 border-orange-200",
-  generating: "text-green-600 bg-green-50 border-green-200",
-  complete: "text-green-600 bg-green-50 border-green-200",
+  analyzing: "text-gray-700 bg-white border-gray-200",
+  searching: "text-gray-700 bg-white border-gray-200",
+  reflecting: "text-gray-700 bg-white border-gray-200",
+  refining: "text-gray-700 bg-white border-gray-200",
+  generating: "text-gray-700 bg-white border-gray-200",
+  complete: "text-gray-700 bg-white border-gray-200",
 };
 
 /**
@@ -67,17 +68,17 @@ export function AgentSearchProgress({ state }: { state: AgentSearchState }) {
   const colorClasses = statusColors[state.status] || statusColors.searching;
 
   return (
-    <div className={cn("rounded-lg border p-4 my-3", colorClasses)}>
+    <div className={cn("rounded-lg border border-gray-200 bg-white shadow-sm p-4 my-3")}>
       {/* Header with current status */}
       <div className="flex items-center gap-2 mb-3">
         {state.status === "complete" ? (
-          <CheckCircle2 className="w-5 h-5" />
+          <CheckCircle2 className="w-5 h-5 text-gray-600" />
         ) : (
-          <Loader2 className="w-5 h-5 animate-spin" />
+          <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
         )}
-        <span className="font-medium text-sm">{statusLabels[state.status]}</span>
+        <span className="font-medium text-sm text-gray-700">{statusLabels[state.status]}</span>
         {state.iteration && state.maxIterations && (
-          <span className="ml-auto text-xs opacity-70">
+          <span className="ml-auto text-xs text-gray-500">
             Iteration {state.iteration}/{state.maxIterations}
           </span>
         )}
@@ -85,7 +86,7 @@ export function AgentSearchProgress({ state }: { state: AgentSearchState }) {
 
       {/* Current query being searched */}
       {state.currentQuery && state.status === "searching" && (
-        <div className="text-xs bg-white/60 rounded px-2 py-1.5 mb-3 font-mono border border-current/10">
+        <div className="text-xs text-gray-700 bg-gray-50 rounded px-2 py-1.5 mb-3 font-mono border border-gray-200">
           "{state.currentQuery}"
         </div>
       )}
@@ -98,13 +99,13 @@ export function AgentSearchProgress({ state }: { state: AgentSearchState }) {
               key={step.id}
               className={cn(
                 "flex items-center gap-2 text-sm",
-                step.done ? "text-gray-600" : "text-gray-800"
+                step.done ? "text-gray-500" : "text-gray-700"
               )}
             >
               {step.done ? (
-                <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-gray-500 flex-shrink-0" />
               ) : state.status !== "complete" ? (
-                <Loader2 className="w-4 h-4 text-blue-500 animate-spin flex-shrink-0" />
+                <Loader2 className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
               ) : (
                 <Circle className="w-4 h-4 text-gray-300 flex-shrink-0" />
               )}
@@ -123,32 +124,16 @@ export function AgentSearchProgress({ state }: { state: AgentSearchState }) {
 
       {/* Confidence meter */}
       {state.confidence !== undefined && state.confidence > 0 && (
-        <div className="mt-4 pt-3 border-t border-current/10">
+        <div className="mt-4 pt-3 border-t border-gray-200">
           <div className="flex items-center justify-between text-xs mb-1.5">
-            <span className="opacity-70">Confidence</span>
-            <span
-              className={cn(
-                "font-medium",
-                state.confidence >= 0.7
-                  ? "text-green-600"
-                  : state.confidence >= 0.5
-                  ? "text-amber-600"
-                  : "text-red-500"
-              )}
-            >
+            <span className="text-gray-500">Confidence</span>
+            <span className="font-medium text-gray-700">
               {Math.round(state.confidence * 100)}%
             </span>
           </div>
-          <div className="h-1.5 bg-white/50 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
             <div
-              className={cn(
-                "h-full transition-all duration-500 rounded-full",
-                state.confidence >= 0.7
-                  ? "bg-green-500"
-                  : state.confidence >= 0.5
-                  ? "bg-amber-500"
-                  : "bg-red-400"
-              )}
+              className="h-full bg-gray-400 transition-all duration-500 rounded-full"
               style={{ width: `${state.confidence * 100}%` }}
             />
           </div>
@@ -239,12 +224,12 @@ export function InlineSearchIndicator({
         {[0, 1, 2].map((i) => (
           <div
             key={i}
-            className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"
+            className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce"
             style={{ animationDelay: `${i * 150}ms` }}
           />
         ))}
       </div>
-      <span>Searching</span>
+      <span className="text-gray-700">Searching</span>
       {query && (
         <span className="text-gray-400 text-xs truncate max-w-[200px]">
           "{query}"

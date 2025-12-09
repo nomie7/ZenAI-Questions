@@ -27,20 +27,20 @@ export function SearchActionRenderer() {
       // In progress state - show searching animation
       if (status === "inProgress" || status === "executing") {
         return (
-          <div className="my-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+          <div className="my-3 p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
             <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <div className="flex-shrink-0 w-10 h-10 bg-blue-50 border border-blue-200 rounded-full flex items-center justify-center">
                 <Search className="w-5 h-5 text-blue-600 animate-pulse" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-2">
                   <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-                  <span className="text-sm font-medium text-blue-800">
+                  <span className="text-sm font-medium text-gray-700">
                     Searching Knowledge Base
                   </span>
                 </div>
                 {query && (
-                  <p className="text-sm text-blue-600 italic truncate">
+                  <p className="text-sm text-gray-600 bg-gray-50 rounded px-2 py-1 font-mono border border-gray-200 truncate">
                     "{query}"
                   </p>
                 )}
@@ -59,14 +59,14 @@ export function SearchActionRenderer() {
       if (status === "complete" && searchResult) {
         if (!searchResult.success) {
           return (
-            <div className="my-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="my-3 p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
               <div className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-red-500" />
-                <span className="text-sm font-medium text-red-800">
+                <AlertCircle className="w-5 h-5 text-gray-600" />
+                <span className="text-sm font-medium text-gray-700">
                   Search failed
                 </span>
               </div>
-              <p className="text-sm text-red-600 mt-1">
+              <p className="text-sm text-gray-600 mt-1">
                 {searchResult.error || "Unable to search the knowledge base. Please try again."}
               </p>
             </div>
@@ -74,26 +74,23 @@ export function SearchActionRenderer() {
         }
 
         return (
-          <div className="my-3 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
+          <div className="my-3 p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
             <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
+              <div className="flex-shrink-0 w-10 h-10 bg-gray-100 border border-gray-300 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5 text-gray-600" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-medium text-green-800">
+                  <span className="text-sm font-medium text-gray-700">
                     Search Complete
                   </span>
-                  <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full",
-                    (searchResult.confidence || 0) >= 0.7 ? "bg-green-100 text-green-700" :
-                      (searchResult.confidence || 0) >= 0.5 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
-                  )}>
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
                     {Math.round((searchResult.confidence || 0) * 100)}% confidence
                   </span>
                 </div>
 
                 {/* Show iterations and queries in compact form */}
-                <div className="text-xs text-gray-600 mb-2">
+                <div className="text-xs text-gray-500 mb-2">
                   {searchResult.iterations || 1} iteration{(searchResult.iterations || 1) > 1 ? 's' : ''} · {searchResult.searchQueries?.length || 1} quer{(searchResult.searchQueries?.length || 1) > 1 ? 'ies' : 'y'}
                 </div>
 
@@ -140,17 +137,17 @@ function SearchStep({
         "flex items-center gap-2 text-sm",
         status === "pending" && "text-gray-400",
         status === "active" && "text-blue-600",
-        status === "complete" && "text-green-600"
+        status === "complete" && "text-gray-600"
       )}
     >
       {status === "complete" ? (
-        <CheckCircle2 className="w-4 h-4" />
+        <CheckCircle2 className="w-4 h-4 text-gray-500" />
       ) : status === "active" ? (
-        <Loader2 className="w-4 h-4 animate-spin" />
+        <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
       ) : (
-        <div className="w-4 h-4 rounded-full border-2 border-current opacity-50" />
+        <div className="w-4 h-4 rounded-full border-2 border-gray-300 opacity-50" />
       )}
-      <Icon className={cn("w-4 h-4", status === "pending" && "opacity-50")} />
+      <Icon className={cn("w-4 h-4", status === "pending" && "opacity-50", status === "active" && "text-blue-600", status === "complete" && "text-gray-500")} />
       <span className={status === "complete" ? "line-through opacity-70" : ""}>
         {label}
       </span>
