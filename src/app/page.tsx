@@ -2,7 +2,7 @@
 
 import { CopilotChat } from "@copilotkit/react-ui";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Settings } from "lucide-react";
+import { BookOpen, Settings, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { CustomAssistantMessage, CustomUserMessage } from "@/components/chat/custom-assistant-message";
 import { createCitationTagRenderers } from "@/components/chat/citation-renderer";
@@ -31,6 +31,12 @@ export default function Home() {
             <h1 className="text-xl font-semibold">Knowledge Assistant</h1>
           </div>
           <nav className="flex items-center gap-2">
+            <Link href="/pitch-search">
+              <Button variant="outline" size="sm">
+                <Sparkles className="w-4 h-4 mr-2" />
+                Find Similar Questions
+              </Button>
+            </Link>
             <Link href="/knowledge">
               <Button variant="outline" size="sm">
                 <Settings className="w-4 h-4 mr-2" />
