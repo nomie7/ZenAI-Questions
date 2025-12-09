@@ -1,6 +1,6 @@
 import { pdf } from "pdf-to-img";
 import type { DocumentParser, ParsedDocument, ParsedPage } from "./index";
-import { convertPptToPdf } from "./convert-utils";
+import { convertDocToPdf, convertPptToPdf } from "./convert-utils";
 
 /**
  * Element returned by Unstructured API
@@ -84,6 +84,7 @@ export class UnstructuredParser implements DocumentParser {
 
     const isPdf = ext === "pdf";
     const isPpt = ext === "ppt" || ext === "pptx";
+    const isDoc = ext === "doc" || ext === "docx";
 
     console.log(`Processing ${ext.toUpperCase()} with Unstructured API: ${filename}`);
 
@@ -102,6 +103,22 @@ export class UnstructuredParser implements DocumentParser {
         console.error("Failed to convert PPT to PDF:", error);
         console.log("Falling back to standard Unstructured processing for PPT...");
         // Fallback to standard processing if conversion fails
+        return this.processWholeDocument(file, filename);
+      }
+    }
+
+    // For Word docs, convert to PDF then process page images so citations have previews
+    if (isDoc) {
+      try {
+        console.log("Converting DOC/DOCX to PDF for image extraction...");
+        const pdfBuffer = await convertDocToPdf(file, filename);
+        return this.processPdfPageByPage(
+          pdfBuffer,
+          filename.replace(/\.(doc|docx)$/i, ".pdf")
+        );
+      } catch (error) {
+        console.error("Failed to convert DOC/DOCX to PDF:", error);
+        console.log("Falling back to standard Unstructured processing for DOC/DOCX...");
         return this.processWholeDocument(file, filename);
       }
     }

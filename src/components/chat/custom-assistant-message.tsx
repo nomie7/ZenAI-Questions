@@ -9,6 +9,13 @@ import { useCopilotChat } from "@copilotkit/react-core";
 import { Sparkles, Loader2 } from "lucide-react";
 import { MessageActionButtons } from "./message-action-buttons";
 
+type RoleMessage = {
+  id?: string;
+  role?: string;
+  content?: string;
+  generativeUI?: () => React.ReactNode;
+};
+
 /**
  * Custom Assistant Message component for CopilotKit
  *
@@ -21,20 +28,22 @@ import { MessageActionButtons } from "./message-action-buttons";
  */
 export function CustomAssistantMessage(props: AssistantMessageProps) {
   const { message, isLoading, subComponent, markdownTagRenderers } = props;
-  const content = message?.content || "";
+  const roleMessage = message as RoleMessage | undefined;
+  const content = roleMessage?.content || "";
   const { visibleMessages } = useCopilotChat();
 
   // Find the previous user message for this assistant message
   const getPreviousUserMessage = (): string | undefined => {
-    if (!message?.id || !visibleMessages) return undefined;
+    if (!roleMessage?.id || !visibleMessages) return undefined;
 
-    const currentIndex = visibleMessages.findIndex((m) => m.id === message.id);
+    const typedMessages = visibleMessages as unknown as RoleMessage[];
+    const currentIndex = typedMessages.findIndex((m) => m.id === roleMessage.id);
     if (currentIndex <= 0) return undefined;
 
     // Look backwards for the most recent user message
     for (let i = currentIndex - 1; i >= 0; i--) {
-      const msg = visibleMessages[i];
-      if (msg.role === "user" && msg.content) {
+      const msg = typedMessages[i];
+      if (msg?.role === "user" && msg.content) {
         return msg.content;
       }
     }
@@ -44,7 +53,7 @@ export function CustomAssistantMessage(props: AssistantMessageProps) {
   const userMessage = getPreviousUserMessage();
 
   // Get generativeUI if available (new way)
-  const generativeUI = message?.generativeUI?.();
+  const generativeUI = roleMessage?.generativeUI?.();
 
   // Don't render empty messages - avoids blank bubbles between tool calls and responses
   // Only render if there's actual content or UI to display
@@ -96,9 +105,9 @@ export function CustomAssistantMessage(props: AssistantMessageProps) {
         )}
 
         {/* Action buttons (copy, regenerate, thumbs up/down) - only show when not loading */}
-        {!isLoading && message?.id && content && (
+        {!isLoading && roleMessage?.id && content && (
           <MessageActionButtons
-            messageId={message.id}
+            messageId={roleMessage.id}
             content={content}
             userMessage={userMessage}
           />
@@ -112,7 +121,7 @@ export function CustomAssistantMessage(props: AssistantMessageProps) {
  * Custom User Message component for CopilotKit
  */
 export function CustomUserMessage(props: UserMessageProps) {
-  const content = props.message?.content || "";
+  const content = (props.message as RoleMessage | undefined)?.content || "";
 
   return (
     <div className="flex items-start gap-3 py-4 px-4 justify-end">

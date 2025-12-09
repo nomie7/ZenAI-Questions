@@ -48,3 +48,37 @@ export async function convertPptToPdf(
     }
   }
 }
+
+/**
+ * Convert DOC/DOCX to PDF using LibreOffice so we can snapshot pages.
+ *
+ * Requires LibreOffice (`soffice`) in PATH.
+ */
+export async function convertDocToPdf(
+  file: Buffer,
+  filename: string
+): Promise<Buffer> {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "doc-conversion-"));
+  const safeFilename = filename.replace(/ /g, "_");
+  const inputPath = path.join(tempDir, safeFilename);
+  const outputPath = path.join(
+    tempDir,
+    safeFilename.replace(/\.(doc|docx)$/i, ".pdf")
+  );
+
+  try {
+    await fs.writeFile(inputPath, file);
+
+    const command = `soffice --headless --convert-to pdf --outdir "${tempDir}" "${inputPath}"`;
+    await execAsync(command);
+
+    const pdfBuffer = await fs.readFile(outputPath);
+    return pdfBuffer;
+  } finally {
+    try {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    } catch (e) {
+      console.error("Failed to cleanup temp dir:", e);
+    }
+  }
+}

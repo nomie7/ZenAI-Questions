@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { pdf } from "pdf-to-img";
 import type { DocumentParser, ParsedDocument, ParsedPage } from "./index";
-import { convertPptToPdf } from "./convert-utils";
+import { convertDocToPdf, convertPptToPdf } from "./convert-utils";
 
 /**
  * Gemini Flash parser for advanced document understanding
@@ -34,9 +34,13 @@ export class GeminiParser implements DocumentParser {
       console.log("[Gemini] Converting PPT/PPTX to PDF...");
       pdfBuffer = await convertPptToPdf(file, filename);
       console.log("[Gemini] PPT/PPTX converted to PDF successfully");
+    } else if (ext === "doc" || ext === "docx") {
+      console.log("[Gemini] Converting DOC/DOCX to PDF for image extraction...");
+      pdfBuffer = await convertDocToPdf(file, filename);
+      console.log("[Gemini] DOC/DOCX converted to PDF successfully");
     } else if (ext !== "pdf") {
       throw new Error(
-        `Unsupported file type: ${ext}. Supported: pdf, ppt, pptx`
+        `Unsupported file type: ${ext}. Supported: pdf, ppt, pptx, doc, docx`
       );
     }
 
