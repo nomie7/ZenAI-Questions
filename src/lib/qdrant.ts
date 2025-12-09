@@ -4,6 +4,7 @@ import { QdrantClient } from "@qdrant/js-client-rest";
 const QDRANT_URL = process.env.QDRANT_URL || "http://localhost:6333";
 const QDRANT_API_KEY = process.env.QDRANT_API_KEY;
 const COLLECTION_NAME = process.env.QDRANT_COLLECTION_NAME || "knowledge_base";
+const QUESTIONS_COLLECTION_NAME = process.env.QDRANT_QUESTIONS_COLLECTION || "pitch_questions";
 
 // OpenAI embedding dimension (text-embedding-3-small)
 const EMBEDDING_DIMENSION = 1536;
@@ -36,6 +37,13 @@ export function getClient(): QdrantClient {
  */
 export function getCollectionName(): string {
   return COLLECTION_NAME;
+}
+
+/**
+ * Get the questions collection name
+ */
+export function getQuestionsCollectionName(): string {
+  return QUESTIONS_COLLECTION_NAME;
 }
 
 /**
@@ -272,4 +280,181 @@ export async function queryHybrid(options: {
     score: r.score,
     payload: (r.payload as Record<string, unknown>) || {},
   }));
+}
+
+// =============================================================================
+// Pitch Questions Collection Functions
+// =============================================================================
+
+/**
+ * Ensure the pitch questions collection exists with proper configuration
+ * This collection stores extracted Q&A pairs for similarity search
+ */
+export async function ensureQuestionsCollection(): Promise<void> {
+  const qdrant = getClient();
+
+  try {
+    const collections = await qdrant.getCollections();
+    const exists = collections.collections.some(
+      (c) => c.name === QUESTIONS_COLLECTION_NAME
+    );
+
+    if (!exists) {
+      // Create collection with dense vectors for question similarity search
+      await qdrant.createCollection(QUESTIONS_COLLECTION_NAME, {
+        vectors: {
+          [DENSE_VECTOR_NAME]: {
+            size: EMBEDDING_DIMENSION,
+            distance: "Cosine",
+          },
+        },
+        sparse_vectors: {
+          [SPARSE_VECTOR_NAME]: {
+            modifier: "idf",
+            index: {
+              on_disk: true,
+            },
+          },
+        },
+        optimizers_config: {
+          indexing_threshold: 0,
+        },
+      });
+
+      // Create payload indexes for filtering
+      await qdrant.createPayloadIndex(QUESTIONS_COLLECTION_NAME, {
+        field_name: "source_doc_id",
+        field_schema: "keyword",
+      });
+
+      await qdrant.createPayloadIndex(QUESTIONS_COLLECTION_NAME, {
+        field_name: "client",
+        field_schema: "keyword",
+      });
+
+      await qdrant.createPayloadIndex(QUESTIONS_COLLECTION_NAME, {
+        field_name: "vertical",
+        field_schema: "keyword",
+      });
+
+      await qdrant.createPayloadIndex(QUESTIONS_COLLECTION_NAME, {
+        field_name: "region",
+        field_schema: "keyword",
+      });
+
+      await qdrant.createPayloadIndex(QUESTIONS_COLLECTION_NAME, {
+        field_name: "year",
+        field_schema: "integer",
+      });
+
+      console.log(`Created Qdrant collection: ${QUESTIONS_COLLECTION_NAME}`);
+    }
+  } catch (error) {
+    console.error("Error ensuring questions collection:", error);
+    throw error;
+  }
+}
+
+/**
+ * Upsert Q&A vectors into the questions collection
+ */
+export async function upsertQuestionVectors(
+  points: Array<{
+    id: string;
+    vector: {
+      dense: number[];
+      text: { text: string; model: string };
+    };
+    payload: Record<string, unknown>;
+  }>
+): Promise<void> {
+  const qdrant = getClient();
+
+  await qdrant.upsert(QUESTIONS_COLLECTION_NAME, {
+    points: points.map((p) => ({
+      id: p.id,
+      vector: p.vector as any,
+      payload: p.payload,
+    })),
+  });
+}
+
+/**
+ * Search for similar questions using hybrid search
+ */
+export async function searchSimilarQuestions(options: {
+  denseVector: number[];
+  queryText: string;
+  limit: number;
+  filter?: Record<string, unknown>;
+  fusion?: "rrf" | "dbsf";
+}): Promise<
+  Array<{
+    id: string;
+    score: number;
+    payload: Record<string, unknown>;
+  }>
+> {
+  const {
+    denseVector,
+    queryText,
+    limit,
+    filter,
+    fusion = "rrf",
+  } = options;
+
+  const candidates = Math.max(limit * 3, 30);
+  const qdrant = getClient();
+
+  const response = await qdrant.query(QUESTIONS_COLLECTION_NAME, {
+    prefetch: [
+      {
+        query: {
+          text: queryText,
+          model: "qdrant/bm25",
+        },
+        using: SPARSE_VECTOR_NAME,
+        limit: candidates,
+        filter: filter as never,
+      },
+      {
+        query: denseVector,
+        using: DENSE_VECTOR_NAME,
+        limit: candidates,
+        filter: filter as never,
+      },
+    ],
+    query: { fusion },
+    limit,
+    with_payload: true,
+  });
+
+  const points = (response as any)?.points ?? response ?? [];
+
+  return points.map((r: any) => ({
+    id: String(r.id),
+    score: r.score,
+    payload: (r.payload as Record<string, unknown>) || {},
+  }));
+}
+
+/**
+ * Delete question vectors by source document ID
+ */
+export async function deleteQuestionsByDocId(docId: string): Promise<void> {
+  const qdrant = getClient();
+
+  await qdrant.delete(QUESTIONS_COLLECTION_NAME, {
+    filter: {
+      must: [{ key: "source_doc_id", match: { value: docId } }],
+    } as never,
+  });
+}
+
+/**
+ * Get questions collection info
+ */
+export async function getQuestionsCollectionInfo(): Promise<unknown> {
+  const qdrant = getClient();
+  return qdrant.getCollection(QUESTIONS_COLLECTION_NAME);
 }

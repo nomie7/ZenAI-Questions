@@ -3,16 +3,20 @@ import {
   processDocument,
   type ProcessedDocument,
 } from "./document-processor";
-import { embedTexts } from "./embeddings";
+import { embedTexts, embedText } from "./embeddings";
 import {
   ensureCollection,
   upsertVectors,
   deleteVectorsByFilter,
   getClient,
   getCollectionName,
+  ensureQuestionsCollection,
+  upsertQuestionVectors,
+  deleteQuestionsByDocId,
 } from "./qdrant";
 import { ensureBucket, deleteDocumentFiles } from "./storage";
 import type { ParserType } from "./parsers";
+import { extractQAPairsFromDocument, filterByConfidence } from "./qa-extractor";
 
 /**
  * Metadata fields for pitch response library
@@ -42,6 +46,7 @@ export interface IngestResult {
   docName: string;
   pageCount: number;
   chunkCount: number;
+  qaCount: number;        // Number of extracted Q&A pairs
   status: "ready" | "failed";
   error?: string;
   parserUsed: ParserType;
@@ -88,6 +93,10 @@ export async function ingestDocument(
     await ensureCollection();
     console.log("[ingest] Qdrant collection ready");
 
+    console.log("[ingest] Ensuring questions collection...");
+    await ensureQuestionsCollection();
+    console.log("[ingest] Questions collection ready");
+
     console.log("[ingest] Ensuring MinIO bucket...");
     await ensureBucket();
     console.log("[ingest] MinIO bucket ready");
@@ -114,6 +123,7 @@ export async function ingestDocument(
       await deleteVectorsByFilter({
         must: [{ key: "doc_id", match: { value: replaceDocId } }],
       });
+      await deleteQuestionsByDocId(replaceDocId);
       await deleteDocumentFiles(replaceDocId);
     }
 
@@ -206,6 +216,68 @@ export async function ingestDocument(
     console.log(`Storing ${points.length} vectors in Qdrant...`);
     await upsertVectors(points);
 
+    // Extract Q&A pairs from the document
+    console.log("[ingest] Extracting Q&A pairs from document...");
+    let qaCount = 0;
+    try {
+      const qaPairs = await extractQAPairsFromDocument(
+        processed.pages.map((p) => ({
+          pageNumber: p.pageNumber,
+          chunks: p.chunks,
+        })),
+        docId,
+        docName,
+        metadata
+      );
+
+      // Filter by confidence and store in questions collection
+      const filteredQA = filterByConfidence(qaPairs, 0.6);
+
+      if (filteredQA.length > 0) {
+        console.log(`[ingest] Storing ${filteredQA.length} Q&A pairs...`);
+
+        // Generate embeddings for questions (we embed the question text for similarity search)
+        const questionTexts = filteredQA.map((qa) => qa.questionText);
+        const questionEmbeddings = await embedTexts(questionTexts);
+
+        // Prepare points for the questions collection
+        const qaPoints = filteredQA.map((qa, index) => ({
+          id: qa.id,
+          vector: {
+            dense: questionEmbeddings[index],
+            text: {
+              text: qa.questionText,
+              model: "qdrant/bm25",
+            },
+          },
+          payload: {
+            question_text: qa.questionText,
+            answer_text: qa.answerText,
+            source_doc_id: qa.sourceDocId,
+            source_doc_name: qa.sourceDocName,
+            source_page: qa.sourcePageNumber,
+            source_chunk_id: qa.sourceChunkId,
+            confidence: qa.confidence,
+            client: qa.metadata.client || "",
+            vertical: qa.metadata.vertical || "",
+            region: qa.metadata.region || "",
+            theme: qa.metadata.theme || "",
+            year: qa.metadata.year || null,
+            extracted_at: qa.extractedAt.toISOString(),
+          },
+        }));
+
+        await upsertQuestionVectors(qaPoints);
+        qaCount = filteredQA.length;
+        console.log(`[ingest] Successfully stored ${qaCount} Q&A pairs`);
+      } else {
+        console.log("[ingest] No Q&A pairs extracted above confidence threshold");
+      }
+    } catch (qaError) {
+      console.warn("[ingest] Q&A extraction failed (non-blocking):", qaError);
+      // Q&A extraction is non-blocking - document still ingested successfully
+    }
+
     // Update registry with final state
     const record: DocumentRecord = {
       docId,
@@ -223,13 +295,14 @@ export async function ingestDocument(
     };
     documentRegistry.set(docId, record);
 
-    console.log(`Successfully ingested document: ${docName} (${docId})`);
+    console.log(`Successfully ingested document: ${docName} (${docId}) with ${qaCount} Q&A pairs`);
 
     return {
       docId,
       docName,
       pageCount: processed.pages.length,
       chunkCount: processed.totalChunks,
+      qaCount,
       status: "ready",
       parserUsed: parserType,
       processedAt: new Date(),
@@ -249,6 +322,7 @@ export async function ingestDocument(
       docName,
       pageCount: 0,
       chunkCount: 0,
+      qaCount: 0,
       status: "failed",
       error: (error as Error).message,
       parserUsed: parserType,
@@ -276,10 +350,13 @@ export async function archiveDocument(docId: string): Promise<void> {
  * Delete a document completely
  */
 export async function deleteDocument(docId: string): Promise<void> {
-  // Delete from Qdrant
+  // Delete from Qdrant main collection
   await deleteVectorsByFilter({
     must: [{ key: "doc_id", match: { value: docId } }],
   });
+
+  // Delete from questions collection
+  await deleteQuestionsByDocId(docId);
 
   // Delete from MinIO
   await deleteDocumentFiles(docId);
