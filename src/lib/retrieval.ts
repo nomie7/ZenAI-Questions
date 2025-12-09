@@ -12,6 +12,23 @@ export interface RetrievedChunk {
   imageUrl: string;
   score: number;
   parserUsed: string;
+  // Pitch response library metadata
+  client?: string;
+  vertical?: string;
+  region?: string;
+  theme?: string;
+  year?: number;
+}
+
+/**
+ * Metadata filters for pitch response library
+ */
+export interface MetadataFilters {
+  client?: string;           // Filter by client name
+  vertical?: string | string[];  // Filter by vertical(s)
+  region?: string;           // Filter by region
+  theme?: string | string[]; // Filter by theme(s)
+  year?: number;             // Filter by year
 }
 
 export interface RetrievalOptions {
@@ -20,6 +37,7 @@ export interface RetrievalOptions {
   status?: string; // Filter by status (default: "ready")
   diversify?: boolean; // Apply MMR diversification
   diversityWeight?: number; // MMR lambda (0-1, higher = more diverse)
+  filters?: MetadataFilters; // Pitch response library metadata filters
 }
 
 export interface CitationInfo {
@@ -43,6 +61,7 @@ export async function retrieveContext(
     status = "ready",
     diversify = true,
     diversityWeight = 0.7,
+    filters,
   } = options;
 
   // Generate dense query embedding
@@ -58,6 +77,70 @@ export async function retrieveContext(
       key: "doc_id",
       match: { value: docId },
     });
+  }
+
+  // Apply pitch response library metadata filters
+  if (filters) {
+    if (filters.client) {
+      (filter.must as Array<unknown>).push({
+        key: "client",
+        match: { value: filters.client },
+      });
+    }
+
+    if (filters.vertical) {
+      const verticals = Array.isArray(filters.vertical)
+        ? filters.vertical
+        : [filters.vertical];
+      if (verticals.length === 1) {
+        (filter.must as Array<unknown>).push({
+          key: "vertical",
+          match: { value: verticals[0] },
+        });
+      } else if (verticals.length > 1) {
+        // Use "should" with min_should_match for OR logic
+        (filter.must as Array<unknown>).push({
+          should: verticals.map((v) => ({
+            key: "vertical",
+            match: { value: v },
+          })),
+        });
+      }
+    }
+
+    if (filters.region) {
+      (filter.must as Array<unknown>).push({
+        key: "region",
+        match: { value: filters.region },
+      });
+    }
+
+    if (filters.theme) {
+      const themes = Array.isArray(filters.theme)
+        ? filters.theme
+        : [filters.theme];
+      // Theme is stored as comma-separated string, use text match
+      if (themes.length === 1) {
+        (filter.must as Array<unknown>).push({
+          key: "theme",
+          match: { text: themes[0] },
+        });
+      } else if (themes.length > 1) {
+        (filter.must as Array<unknown>).push({
+          should: themes.map((t) => ({
+            key: "theme",
+            match: { text: t },
+          })),
+        });
+      }
+    }
+
+    if (filters.year) {
+      (filter.must as Array<unknown>).push({
+        key: "year",
+        match: { value: filters.year },
+      });
+    }
   }
 
   // Retrieve more candidates if we're going to diversify
@@ -83,6 +166,12 @@ export async function retrieveContext(
       imageUrl: (r.payload.image_url as string) || "",
       score: r.score,
       parserUsed: (r.payload.parser_used as string) || "",
+      // Pitch response library metadata
+      client: (r.payload.client as string) || undefined,
+      vertical: (r.payload.vertical as string) || undefined,
+      region: (r.payload.region as string) || undefined,
+      theme: (r.payload.theme as string) || undefined,
+      year: (r.payload.year as number) || undefined,
     }));
   } catch (err) {
     console.warn("Hybrid query failed, falling back to dense-only", err);
@@ -97,6 +186,12 @@ export async function retrieveContext(
       imageUrl: (r.payload.image_url as string) || "",
       score: r.score,
       parserUsed: (r.payload.parser_used as string) || "",
+      // Pitch response library metadata
+      client: (r.payload.client as string) || undefined,
+      vertical: (r.payload.vertical as string) || undefined,
+      region: (r.payload.region as string) || undefined,
+      theme: (r.payload.theme as string) || undefined,
+      year: (r.payload.year as number) || undefined,
     }));
   }
 

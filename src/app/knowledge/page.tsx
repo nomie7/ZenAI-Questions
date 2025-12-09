@@ -201,7 +201,7 @@ export default function KnowledgePage() {
 
       {/* Upload dialog */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Upload New Document</DialogTitle>
           </DialogHeader>
@@ -214,7 +214,7 @@ export default function KnowledgePage() {
 
       {/* Replace dialog */}
       <Dialog open={!!replaceDoc} onOpenChange={() => setReplaceDoc(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Replace Document</DialogTitle>
           </DialogHeader>

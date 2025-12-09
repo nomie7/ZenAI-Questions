@@ -19,6 +19,11 @@ import type { ParserType } from "@/lib/parsers";
  * - replaceDocId: Document ID to replace (optional)
  * - docType: Document type for metadata (optional)
  * - topic: Topic/category for filtering (optional)
+ * - client: Client name (optional, for pitch response library)
+ * - vertical: Industry vertical (optional)
+ * - region: Geographic scope - global/local/etc (optional)
+ * - theme: Theme/topic tags (optional)
+ * - year: Year of pitch (optional)
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
@@ -51,6 +56,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const docType = formData.get("docType") as string | null;
     const topic = formData.get("topic") as string | null;
 
+    // Pitch response library metadata
+    const client = formData.get("client") as string | null;
+    const vertical = formData.get("vertical") as string | null;
+    const region = formData.get("region") as string | null;
+    const theme = formData.get("theme") as string | null;
+    const yearStr = formData.get("year") as string | null;
+    const year = yearStr ? parseInt(yearStr, 10) : undefined;
+
     // Validate file type
     const allowedExtensions = [
       ".pdf", ".ppt", ".pptx", ".doc", ".docx",
@@ -81,6 +94,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           docType: docType || undefined,
           topic: topic || undefined,
           status: "ready",
+          // Pitch response library metadata
+          client: client || undefined,
+          vertical: vertical || undefined,
+          region: region || undefined,
+          theme: theme || undefined,
+          year: year || undefined,
         },
       }
     );

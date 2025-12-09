@@ -11,15 +11,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Upload, FileText, AlertCircle, CheckCircle } from "lucide-react";
+import { Upload, FileText, AlertCircle, CheckCircle, X, FileUp, Building2, Tag } from "lucide-react";
+
+// Predefined vertical options
+const VERTICAL_OPTIONS = [
+  "CPG",
+  "Entertainment",
+  "B2B",
+  "Retail",
+  "Financial Services",
+  "Healthcare",
+  "Technology",
+  "Automotive",
+  "Travel & Hospitality",
+  "Media & Publishing",
+  "Telecommunications",
+  "Other",
+] as const;
+
+// Predefined region options
+const REGION_OPTIONS = [
+  { value: "global", label: "Global" },
+  { value: "local", label: "Local" },
+  { value: "apac", label: "APAC" },
+  { value: "emea", label: "EMEA" },
+  { value: "americas", label: "Americas" },
+] as const;
 
 interface UploadFormProps {
   replaceDocId?: string;
@@ -43,10 +68,39 @@ export function UploadForm({
   );
   const [docType, setDocType] = useState("");
   const [topic, setTopic] = useState("");
+  // Pitch response library metadata
+  const [client, setClient] = useState("");
+  const [vertical, setVertical] = useState("");
+  const [region, setRegion] = useState("");
+  const [theme, setTheme] = useState("");
+  const [themes, setThemes] = useState<string[]>([]); // For multiple themes
+  const [year, setYear] = useState<string>("");
+
   const [status, setStatus] = useState<UploadStatus>("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle adding a theme tag
+  const addTheme = () => {
+    if (theme.trim() && !themes.includes(theme.trim())) {
+      setThemes([...themes, theme.trim()]);
+      setTheme("");
+    }
+  };
+
+  // Handle removing a theme tag
+  const removeTheme = (themeToRemove: string) => {
+    setThemes(themes.filter((t) => t !== themeToRemove));
+  };
+
+  // Handle Enter key in theme input
+  const handleThemeKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addTheme();
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -56,6 +110,13 @@ export function UploadForm({
         // Auto-fill document name from filename
         setDocName(selectedFile.name.replace(/\.[^/.]+$/, ""));
       }
+    }
+  };
+
+  const clearFile = () => {
+    setFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
@@ -91,6 +152,22 @@ export function UploadForm({
       if (topic) {
         formData.append("topic", topic);
       }
+      // Pitch response library metadata
+      if (client) {
+        formData.append("client", client);
+      }
+      if (vertical) {
+        formData.append("vertical", vertical);
+      }
+      if (region) {
+        formData.append("region", region);
+      }
+      if (themes.length > 0) {
+        formData.append("theme", themes.join(", "));
+      }
+      if (year) {
+        formData.append("year", year);
+      }
 
       setProgress(30);
       setStatus("processing");
@@ -117,6 +194,13 @@ export function UploadForm({
         setDocName("");
         setDocType("");
         setTopic("");
+        // Reset pitch response library fields
+        setClient("");
+        setVertical("");
+        setRegion("");
+        setTheme("");
+        setThemes([]);
+        setYear("");
         setStatus("idle");
         setProgress(0);
         if (fileInputRef.current) {
@@ -133,158 +217,343 @@ export function UploadForm({
   const isProcessing = status === "uploading" || status === "processing";
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Upload className="w-5 h-5" />
-          {replaceDocId ? "Replace Document" : "Upload Document"}
-        </CardTitle>
-        <CardDescription>
-          {replaceDocId
-            ? `Replace "${replaceDocName}" with a new version`
-            : "Upload a document to add to the knowledge base"}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* File input */}
-          <div className="space-y-2">
-            <Label htmlFor="file">Document File</Label>
-            <div
-              className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                file
-                  ? "border-green-300 bg-green-50"
-                  : "border-gray-300 hover:border-blue-400 hover:bg-blue-50"
-              }`}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <input
-                ref={fileInputRef}
-                id="file"
-                type="file"
-                accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,.txt,.md,.html,.htm,.png,.jpg,.jpeg,.tiff,.bmp,.heic"
-                onChange={handleFileChange}
-                className="hidden"
+    <div className="w-full">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Hero File Upload Zone */}
+        <div
+          className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200 min-h-[200px] flex flex-col items-center justify-center ${
+            file
+              ? "border-green-400 bg-green-50/50"
+              : "border-muted-foreground/25 hover:border-primary/50 hover:bg-primary/5"
+          }`}
+          onClick={() => !file && fileInputRef.current?.click()}
+        >
+          <input
+            ref={fileInputRef}
+            id="file"
+            type="file"
+            accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,.txt,.md,.html,.htm,.png,.jpg,.jpeg,.tiff,.bmp,.heic"
+            onChange={handleFileChange}
+            className="hidden"
+            disabled={isProcessing}
+          />
+
+          {file ? (
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+                <FileText className="w-8 h-8 text-green-600" />
+              </div>
+              <div className="space-y-1 text-center">
+                <p className="font-semibold text-lg text-green-700">{file.name}</p>
+                <p className="text-sm text-green-600">
+                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearFile();
+                }}
+                className="mt-2"
                 disabled={isProcessing}
-              />
-              {file ? (
-                <div className="flex items-center justify-center gap-2 text-green-700">
-                  <FileText className="w-5 h-5" />
-                  <span className="font-medium">{file.name}</span>
-                  <span className="text-sm text-green-600">
-                    ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                  </span>
-                </div>
-              ) : (
-                <div className="text-gray-500">
-                  <Upload className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="font-medium">Click to select a document</p>
-                  <p className="text-sm mt-1">PDF, PPT, DOCX, images, and more</p>
+              >
+                <X className="w-4 h-4 mr-2" />
+                Remove file
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                <FileUp className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <div className="space-y-2 text-center">
+                <p className="text-lg font-medium">
+                  Drop your file here, or{" "}
+                  <span className="text-primary">browse</span>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  PDF, DOCX, PPTX, XLSX, TXT, MD, HTML, and images
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Document Details Card */}
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Document Details
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* Document Name and Parser */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-2.5">
+                <Label htmlFor="docName" className="text-sm font-medium">
+                  Document Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="docName"
+                  value={docName}
+                  onChange={(e) => setDocName(e.target.value)}
+                  placeholder="Enter a descriptive name"
+                  disabled={isProcessing}
+                  className="h-11"
+                />
+              </div>
+
+              <div className="space-y-2.5">
+                <Label htmlFor="parserType" className="text-sm font-medium">
+                  Parser Type
+                </Label>
+                <Select
+                  value={parserType}
+                  onValueChange={(v: "gemini" | "unstructured") => setParserType(v)}
+                  disabled={isProcessing}
+                >
+                  <SelectTrigger className="h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unstructured">
+                      Unstructured (Default)
+                    </SelectItem>
+                    <SelectItem value="gemini">
+                      Gemini (OCR, scanned docs)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Document Type and Topic */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-2.5">
+                <Label htmlFor="docType" className="text-sm font-medium">
+                  Document Type
+                </Label>
+                <Input
+                  id="docType"
+                  value={docType}
+                  onChange={(e) => setDocType(e.target.value)}
+                  placeholder="e.g., SOP, FAQ, Proposal"
+                  disabled={isProcessing}
+                  className="h-11"
+                />
+              </div>
+              <div className="space-y-2.5">
+                <Label htmlFor="topic" className="text-sm font-medium">
+                  Topic
+                </Label>
+                <Input
+                  id="topic"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  placeholder="e.g., HR, Engineering, Sales"
+                  disabled={isProcessing}
+                  className="h-11"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Pitch Response Library Card */}
+        <Card>
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Building2 className="w-4 h-4" />
+                Pitch Response Library
+              </CardTitle>
+              <Badge variant="outline" className="text-xs font-normal">
+                Optional
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* Client and Vertical */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-2.5">
+                <Label htmlFor="client" className="text-sm font-medium">
+                  Client
+                </Label>
+                <Input
+                  id="client"
+                  value={client}
+                  onChange={(e) => setClient(e.target.value)}
+                  placeholder="e.g., Spotify, Adobe, Nike"
+                  disabled={isProcessing}
+                  className="h-11"
+                />
+              </div>
+
+              <div className="space-y-2.5">
+                <Label htmlFor="vertical" className="text-sm font-medium">
+                  Vertical
+                </Label>
+                <Select
+                  value={vertical}
+                  onValueChange={setVertical}
+                  disabled={isProcessing}
+                >
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Select vertical" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VERTICAL_OPTIONS.map((v) => (
+                      <SelectItem key={v} value={v}>
+                        {v}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Region and Year */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-2.5">
+                <Label htmlFor="region" className="text-sm font-medium">
+                  Region
+                </Label>
+                <Select
+                  value={region}
+                  onValueChange={setRegion}
+                  disabled={isProcessing}
+                >
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Select region" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {REGION_OPTIONS.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>
+                        {r.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2.5">
+                <Label htmlFor="year" className="text-sm font-medium">
+                  Year
+                </Label>
+                <Input
+                  id="year"
+                  type="number"
+                  min="2000"
+                  max="2030"
+                  value={year}
+                  onChange={(e) => setYear(e.target.value)}
+                  placeholder={new Date().getFullYear().toString()}
+                  disabled={isProcessing}
+                  className="h-11"
+                />
+              </div>
+            </div>
+
+            {/* Themes/Tags */}
+            <div className="space-y-2.5">
+              <Label htmlFor="theme" className="text-sm font-medium flex items-center gap-2">
+                <Tag className="w-3.5 h-3.5" />
+                Themes / Tags
+              </Label>
+              <div className="flex gap-3">
+                <Input
+                  id="theme"
+                  value={theme}
+                  onChange={(e) => setTheme(e.target.value)}
+                  onKeyDown={handleThemeKeyDown}
+                  placeholder="e.g., Data Strategy, Audience Building, Performance"
+                  disabled={isProcessing}
+                  className="h-11 flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addTheme}
+                  disabled={isProcessing || !theme.trim()}
+                  className="h-11 px-5"
+                >
+                  Add
+                </Button>
+              </div>
+              {themes.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {themes.map((t) => (
+                    <Badge
+                      key={t}
+                      variant="secondary"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm"
+                    >
+                      {t}
+                      <button
+                        type="button"
+                        onClick={() => removeTheme(t)}
+                        className="hover:text-destructive ml-1"
+                        disabled={isProcessing}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </Badge>
+                  ))}
                 </div>
               )}
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Document name */}
-          <div className="space-y-2">
-            <Label htmlFor="docName">Document Name</Label>
-            <Input
-              id="docName"
-              value={docName}
-              onChange={(e) => setDocName(e.target.value)}
-              placeholder="Enter a descriptive name"
-              disabled={isProcessing}
-            />
-          </div>
-
-          {/* Parser type */}
-          <div className="space-y-2">
-            <Label htmlFor="parserType">Parser Type</Label>
-            <Select
-              value={parserType}
-              onValueChange={(v: "gemini" | "unstructured") => setParserType(v)}
-              disabled={isProcessing}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="unstructured">
-                  Unstructured (Default - structured docs, tables)
-                </SelectItem>
-                <SelectItem value="gemini">
-                  Gemini (OCR, scanned PDFs, complex layouts)
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Unstructured handles most documents well. Use Gemini for scanned
-              documents or handwritten content.
-            </p>
-          </div>
-
-          {/* Optional metadata */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="docType">Document Type (optional)</Label>
-              <Input
-                id="docType"
-                value={docType}
-                onChange={(e) => setDocType(e.target.value)}
-                placeholder="e.g., SOP, FAQ, Manual"
-                disabled={isProcessing}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="topic">Topic (optional)</Label>
-              <Input
-                id="topic"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder="e.g., HR, Engineering"
-                disabled={isProcessing}
-              />
-            </div>
-          </div>
-
+        {/* Progress and Actions Footer */}
+        <div className="space-y-4 pt-2">
           {/* Progress indicator */}
           {isProcessing && (
             <div className="space-y-2">
-              <Progress value={progress} className="h-2" />
+              <Progress value={progress} className="h-2.5" />
               <p className="text-sm text-center text-muted-foreground">
-                {status === "uploading" ? "Uploading..." : "Processing..."}
+                {status === "uploading" ? "Uploading document..." : "Processing document..."}
               </p>
             </div>
           )}
 
           {/* Status messages */}
           {status === "success" && (
-            <div className="flex items-center gap-2 text-green-600 bg-green-50 p-3 rounded-md">
-              <CheckCircle className="w-5 h-5" />
-              <span>Document uploaded successfully!</span>
+            <div className="flex items-center gap-3 text-green-700 bg-green-50 p-4 rounded-lg border border-green-200">
+              <CheckCircle className="w-5 h-5 flex-shrink-0" />
+              <span className="font-medium">Document uploaded successfully!</span>
             </div>
           )}
 
           {error && (
-            <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-md">
-              <AlertCircle className="w-5 h-5" />
-              <span>{error}</span>
+            <div className="flex items-center gap-3 text-red-700 bg-red-50 p-4 rounded-lg border border-red-200">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <span className="font-medium">{error}</span>
             </div>
           )}
 
           {/* Actions */}
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-3 pt-2">
             {onCancel && (
               <Button
                 type="button"
                 variant="outline"
                 onClick={onCancel}
                 disabled={isProcessing}
+                className="h-11 px-6"
               >
                 Cancel
               </Button>
             )}
-            <Button type="submit" disabled={isProcessing || !file}>
+            <Button
+              type="submit"
+              disabled={isProcessing || !file}
+              className="h-11 px-6"
+            >
               {isProcessing
                 ? "Processing..."
                 : replaceDocId
@@ -292,8 +561,8 @@ export function UploadForm({
                   : "Upload Document"}
             </Button>
           </div>
-        </form>
-      </CardContent>
-    </Card>
+        </div>
+      </form>
+    </div>
   );
 }

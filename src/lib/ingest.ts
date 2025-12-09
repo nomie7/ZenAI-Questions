@@ -14,15 +14,26 @@ import {
 import { ensureBucket, deleteDocumentFiles } from "./storage";
 import type { ParserType } from "./parsers";
 
+/**
+ * Metadata fields for pitch response library
+ */
+export interface DocumentMetadata {
+  docType?: string;
+  topic?: string;
+  category?: string;
+  status?: "ready" | "processing" | "archived";
+  // Pitch response library fields
+  client?: string;           // Client name (e.g., "Spotify", "Adobe")
+  vertical?: string;         // Industry vertical (e.g., "CPG", "Entertainment", "B2B")
+  region?: "global" | "local" | string;  // Geographic scope
+  theme?: string;            // Theme/topic (e.g., "Data Lake Integration", "Audience Strategy")
+  year?: number;             // Year of pitch
+}
+
 export interface IngestOptions {
   parserType?: ParserType;
   replaceDocId?: string; // If set, will replace existing document
-  metadata?: {
-    docType?: string;
-    topic?: string;
-    category?: string;
-    status?: "ready" | "processing" | "archived";
-  };
+  metadata?: DocumentMetadata;
 }
 
 export interface IngestResult {
@@ -46,7 +57,7 @@ export interface DocumentRecord {
   status: "processing" | "ready" | "failed" | "archived";
   createdAt: Date;
   updatedAt: Date;
-  metadata?: Record<string, unknown>;
+  metadata?: DocumentMetadata & Record<string, unknown>;
 }
 
 // In-memory document registry (in production, use a database)
@@ -178,6 +189,12 @@ export async function ingestDocument(
             doc_type: metadata.docType || "unknown",
             topic: metadata.topic || "",
             category: metadata.category || "",
+            // Pitch response library metadata
+            client: metadata.client || "",
+            vertical: metadata.vertical || "",
+            region: metadata.region || "",
+            theme: metadata.theme || "",
+            year: metadata.year || null,
             created_at: new Date().toISOString(),
           },
         });

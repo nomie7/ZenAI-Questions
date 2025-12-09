@@ -10,8 +10,25 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, FileQuestion } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { FileText, FileQuestion, Building2, Globe, Tag, Calendar } from "lucide-react";
 import { DocumentActions } from "./document-actions";
+
+export interface DocumentMetadata {
+  client?: string;
+  vertical?: string;
+  region?: string;
+  theme?: string;
+  year?: number;
+  docType?: string;
+  topic?: string;
+  [key: string]: unknown;
+}
 
 export interface Document {
   docId: string;
@@ -22,7 +39,7 @@ export interface Document {
   status: "processing" | "ready" | "failed" | "archived";
   createdAt: string;
   updatedAt: string;
-  metadata?: Record<string, unknown>;
+  metadata?: DocumentMetadata;
 }
 
 interface DocumentTableProps {
@@ -53,6 +70,105 @@ export function DocumentTable({
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
+  };
+
+  // Render metadata badges for pitch response library fields
+  const renderMetadataBadges = (metadata?: DocumentMetadata) => {
+    if (!metadata) return null;
+
+    const badges: React.ReactNode[] = [];
+
+    if (metadata.client) {
+      badges.push(
+        <TooltipProvider key="client">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 gap-1">
+                <Building2 className="w-3 h-3" />
+                {metadata.client}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>Client</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    if (metadata.vertical) {
+      badges.push(
+        <TooltipProvider key="vertical">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                {metadata.vertical}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>Vertical / Industry</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    if (metadata.region) {
+      badges.push(
+        <TooltipProvider key="region">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1">
+                <Globe className="w-3 h-3" />
+                {metadata.region}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>Region</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    if (metadata.theme) {
+      // Theme can be comma-separated, show first one with count
+      const themes = metadata.theme.split(",").map((t) => t.trim());
+      badges.push(
+        <TooltipProvider key="theme">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 gap-1">
+                <Tag className="w-3 h-3" />
+                {themes[0]}
+                {themes.length > 1 && <span className="text-xs">+{themes.length - 1}</span>}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <span>Themes: {themes.join(", ")}</span>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    if (metadata.year) {
+      badges.push(
+        <TooltipProvider key="year">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 gap-1">
+                <Calendar className="w-3 h-3" />
+                {metadata.year}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>Year</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    if (badges.length === 0) return null;
+
+    return (
+      <div className="flex flex-wrap gap-1 mt-1">
+        {badges}
+      </div>
+    );
   };
 
   const formatDate = (dateString: string) => {
@@ -93,7 +209,7 @@ export function DocumentTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[300px]">Document</TableHead>
+            <TableHead className="w-[400px]">Document</TableHead>
             <TableHead>Pages</TableHead>
             <TableHead>Chunks</TableHead>
             <TableHead>Parser</TableHead>
@@ -106,15 +222,16 @@ export function DocumentTable({
           {documents.map((doc) => (
             <TableRow key={doc.docId}>
               <TableCell>
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-muted-foreground" />
+                <div className="flex items-start gap-2">
+                  <FileText className="w-4 h-4 text-muted-foreground mt-1" />
                   <div>
-                    <p className="font-medium truncate max-w-[250px]">
+                    <p className="font-medium truncate max-w-[350px]">
                       {doc.docName}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {doc.docId.slice(0, 8)}...
                     </p>
+                    {renderMetadataBadges(doc.metadata)}
                   </div>
                 </div>
               </TableCell>
