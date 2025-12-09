@@ -153,8 +153,8 @@ export function getAllFeedback(limit = 100, offset = 0): FeedbackRecord[] {
   const database = getDatabase();
 
   const stmt = database.prepare(`
-    SELECT * FROM feedback 
-    ORDER BY created_at DESC 
+    SELECT * FROM feedback
+    ORDER BY created_at DESC
     LIMIT ? OFFSET ?
   `);
 

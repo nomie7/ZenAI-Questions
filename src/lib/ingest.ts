@@ -28,6 +28,7 @@ export interface DocumentMetadata {
   region?: "global" | "local" | string;  // Geographic scope
   theme?: string;            // Theme/topic (e.g., "Data Lake Integration", "Audience Strategy")
   year?: number;             // Year of pitch
+  [key: string]: unknown;    // Allow additional fields
 }
 
 export interface IngestOptions {

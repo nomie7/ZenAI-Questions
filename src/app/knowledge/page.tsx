@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -26,9 +27,9 @@ import {
 import { FeedbackTable } from "@/components/knowledge/feedback-table";
 
 export default function KnowledgePage() {
+  const router = useRouter();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [replaceDoc, setReplaceDoc] = useState<{
     docId: string;
     docName: string;
@@ -59,7 +60,6 @@ export default function KnowledgePage() {
   };
 
   const handleUploadSuccess = () => {
-    setShowUploadDialog(false);
     setReplaceDoc(null);
     fetchDocuments();
   };
@@ -99,7 +99,7 @@ export default function KnowledgePage() {
               <RefreshCw className="w-4 h-4 mr-2" />
               Refresh
             </Button>
-            <Button size="sm" onClick={() => setShowUploadDialog(true)}>
+            <Button size="sm" onClick={() => router.push("/knowledge/upload")}>
               <Plus className="w-4 h-4 mr-2" />
               Upload Document
             </Button>
@@ -199,22 +199,9 @@ export default function KnowledgePage() {
         </div>
       </div>
 
-      {/* Upload dialog */}
-      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-        <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Upload New Document</DialogTitle>
-          </DialogHeader>
-          <UploadForm
-            onSuccess={handleUploadSuccess}
-            onCancel={() => setShowUploadDialog(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* Replace dialog */}
+      {/* Replace dialog - kept as modal since it's contextual to a specific document */}
       <Dialog open={!!replaceDoc} onOpenChange={() => setReplaceDoc(null)}>
-        <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[90rem] w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Replace Document</DialogTitle>
           </DialogHeader>
