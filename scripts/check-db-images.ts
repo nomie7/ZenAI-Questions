@@ -91,7 +91,7 @@ async function checkDatabase() {
             const samplePoint = allPoints.points.find(p => (p.payload as Record<string, unknown>).image_url);
             if (samplePoint) {
                 const imageUrl = String((samplePoint.payload as Record<string, unknown>).image_url);
-                console.log(`Sample MinIO path: ${imageUrl}`);
+                console.log(`Sample S3 path: ${imageUrl}`);
 
                 try {
                     const { getSignedUrl } = await import("../src/lib/storage");

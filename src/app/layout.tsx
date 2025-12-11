@@ -4,8 +4,8 @@ import "@copilotkit/react-ui/styles.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CopilotKit + LangChain",
-  description: "AI Assistant powered by CopilotKit and LangChain",
+  title: "Zen Pitch Responses Agent",
+  description: "AI-powered pitch response assistant for Zenith Media",
 };
 
 export default function RootLayout({

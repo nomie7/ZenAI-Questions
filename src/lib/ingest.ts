@@ -74,7 +74,7 @@ const SKIP_REGISTRY_SYNC =
 
 /**
  * Ingest a document into the RAG system
- * 1. Process the document (parse, chunk, upload to MinIO)
+ * 1. Process the document (parse, chunk, upload to S3)
  * 2. Generate embeddings for chunks
  * 3. Store vectors in Qdrant with metadata
  */
@@ -97,9 +97,9 @@ export async function ingestDocument(
     await ensureQuestionsCollection();
     console.log("[ingest] Questions collection ready");
 
-    console.log("[ingest] Ensuring MinIO bucket...");
+    console.log("[ingest] Ensuring S3 bucket...");
     await ensureBucket();
-    console.log("[ingest] MinIO bucket ready");
+    console.log("[ingest] S3 bucket ready");
 
     // Update registry to show processing
     documentRegistry.set(docId, {
@@ -358,7 +358,7 @@ export async function deleteDocument(docId: string): Promise<void> {
   // Delete from questions collection
   await deleteQuestionsByDocId(docId);
 
-  // Delete from MinIO
+  // Delete from S3
   await deleteDocumentFiles(docId);
 
   // Remove from registry

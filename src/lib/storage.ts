@@ -11,18 +11,18 @@ import {
 import { getSignedUrl as awsGetSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Readable } from "stream";
 
-// S3 configuration - supports both AWS S3 and MinIO env var names
-const S3_REGION = process.env.MINIO_REGION || process.env.AWS_REGION || "us-east-1";
+// S3 configuration
+const S3_REGION = process.env.S3_REGION || process.env.AWS_REGION || "us-east-1";
 const S3_ACCESS_KEY =
-  process.env.MINIO_ACCESS_KEY ||
+  process.env.S3_ACCESS_KEY ||
   process.env.AWS_ACCESS_KEY_ID ||
   "";
 const S3_SECRET_KEY =
-  process.env.MINIO_SECRET_KEY ||
+  process.env.S3_SECRET_KEY ||
   process.env.AWS_SECRET_ACCESS_KEY ||
   "";
-const S3_BUCKET = process.env.MINIO_BUCKET || process.env.S3_BUCKET || "knowledge-docs";
-const S3_PREFIX = process.env.MINIO_PREFIX || process.env.S3_PREFIX || "";
+const S3_BUCKET = process.env.S3_BUCKET || "knowledge-docs";
+const S3_PREFIX = process.env.S3_PREFIX || "";
 
 let client: S3Client | null = null;
 

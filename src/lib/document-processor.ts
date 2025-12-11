@@ -21,7 +21,7 @@ export interface ProcessedChunk {
 export interface ProcessedPage {
   pageNumber: number;
   text: string;
-  imageUrl: string; // MinIO object path
+  imageUrl: string; // S3 object path
   chunks: ProcessedChunk[];
 }
 
@@ -42,8 +42,8 @@ const CHUNK_OVERLAP = 50; // characters
 /**
  * Process a document file through the full pipeline:
  * 1. Parse the document (extract text and images)
- * 2. Upload original file to MinIO
- * 3. Upload page images to MinIO
+ * 2. Upload original file to S3
+ * 3. Upload page images to S3
  * 4. Chunk the text with appropriate strategy
  */
 export async function processDocument(

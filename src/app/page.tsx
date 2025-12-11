@@ -31,7 +31,7 @@ export default function Home() {
         <div className="flex items-center justify-between px-6 py-3">
           <div className="flex items-center gap-3">
             <BookOpen className="w-6 h-6 text-blue-600" />
-            <h1 className="text-xl font-semibold">Knowledge Assistant</h1>
+            <h1 className="text-xl font-semibold">Zen Pitch Responses Agent</h1>
           </div>
           <nav className="flex items-center gap-2">
             <Button

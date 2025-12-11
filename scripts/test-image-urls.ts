@@ -42,7 +42,7 @@ async function testImageURLs() {
     for (let i = 0; i < Math.min(3, chunks.length); i++) {
         const chunk = chunks[i];
         console.log(`\nChunk ${i + 1}:`);
-        console.log(`  MinIO Path: ${chunk.imageUrl || "(empty)"}`);
+        console.log(`  S3 Path: ${chunk.imageUrl || "(empty)"}`);
 
         if (chunk.imageUrl) {
             try {
@@ -137,7 +137,7 @@ async function testImageURLs() {
     console.log("1. Check browser console for 'ImageViewer - Image URL:' logs");
     console.log("2. Verify the URL in the log is a valid https:// URL");
     console.log("3. Try accessing the URL directly in the browser");
-    console.log("4. Check MinIO/S3 credentials and CORS settings");
+    console.log("4. Check S3 credentials and CORS settings");
 
     console.log("\n" + "=".repeat(60) + "\n");
 }
