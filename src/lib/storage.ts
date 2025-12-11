@@ -1,115 +1,72 @@
-import * as Minio from "minio";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  HeadObjectCommand,
+  HeadBucketCommand,
+  ListObjectsV2Command,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl as awsGetSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { Readable } from "stream";
 
-// MinIO configuration
-const MINIO_ENDPOINT = process.env.MINIO_ENDPOINT || "localhost";
-const MINIO_PORT = parseInt(process.env.MINIO_PORT || "9000", 10);
-// Support both typical MinIO env names and username/password aliases
-const MINIO_ACCESS_KEY =
+// S3 configuration - supports both AWS S3 and MinIO env var names
+const S3_REGION = process.env.MINIO_REGION || process.env.AWS_REGION || "us-east-1";
+const S3_ACCESS_KEY =
   process.env.MINIO_ACCESS_KEY ||
-  process.env.MINIO_USERNAME || // alias for username
+  process.env.AWS_ACCESS_KEY_ID ||
   "";
-const MINIO_SECRET_KEY =
+const S3_SECRET_KEY =
   process.env.MINIO_SECRET_KEY ||
-  process.env.MINIO_PASSWORD || // alias for password
+  process.env.AWS_SECRET_ACCESS_KEY ||
   "";
-const MINIO_BUCKET = process.env.MINIO_BUCKET || "knowledge-docs";
-const MINIO_USE_SSL = process.env.MINIO_USE_SSL === "true";
+const S3_BUCKET = process.env.MINIO_BUCKET || process.env.S3_BUCKET || "knowledge-docs";
+const S3_PREFIX = process.env.MINIO_PREFIX || process.env.S3_PREFIX || "";
 
-let client: Minio.Client | null = null;
+let client: S3Client | null = null;
 
 /**
- * Get or create the MinIO client singleton
+ * Get or create the S3 client singleton
  */
-export function getStorageClient(): Minio.Client {
+export function getStorageClient(): S3Client {
   if (!client) {
-    const { endPoint, port, useSSL } = resolveMinioEndpoint();
-
-    client = new Minio.Client({
-      endPoint,
-      port,
-      useSSL,
-      accessKey: MINIO_ACCESS_KEY,
-      secretKey: MINIO_SECRET_KEY,
+    client = new S3Client({
+      region: S3_REGION,
+      credentials: {
+        accessKeyId: S3_ACCESS_KEY,
+        secretAccessKey: S3_SECRET_KEY,
+      },
     });
   }
   return client;
-}
-
-function resolveMinioEndpoint(): {
-  endPoint: string;
-  port: number;
-  useSSL: boolean;
-} {
-  // If MINIO_ENDPOINT includes scheme, parse it; otherwise use raw values.
-  if (
-    MINIO_ENDPOINT.startsWith("http://") ||
-    MINIO_ENDPOINT.startsWith("https://")
-  ) {
-    try {
-      const url = new URL(MINIO_ENDPOINT);
-      const endPoint = url.hostname;
-      const useSSL = url.protocol === "https:";
-      // Use port from URL if specified, otherwise fall back to MINIO_PORT env var
-      const port =
-        url.port && Number(url.port) > 0
-          ? Number(url.port)
-          : MINIO_PORT > 0
-            ? MINIO_PORT
-            : useSSL
-              ? 443
-              : 80;
-      return { endPoint, port, useSSL };
-    } catch {
-      // Fall through to defaults
-    }
-  }
-
-  return {
-    endPoint: MINIO_ENDPOINT,
-    port: MINIO_PORT,
-    useSSL: MINIO_USE_SSL,
-  };
 }
 
 /**
  * Get the bucket name
  */
 export function getBucketName(): string {
-  return MINIO_BUCKET;
+  return S3_BUCKET;
 }
 
 /**
- * Ensure the bucket exists
+ * Get the full object path with prefix
+ */
+function withPrefix(objectName: string): string {
+  if (!S3_PREFIX) return objectName;
+  return `${S3_PREFIX}/${objectName}`;
+}
+
+/**
+ * Ensure the bucket exists and is accessible
+ * Note: For IAM users with limited permissions (no s3:ListBucket),
+ * we skip the bucket check and assume it exists.
  */
 export async function ensureBucket(): Promise<void> {
-  const minio = getStorageClient();
-
-  const exists = await minio.bucketExists(MINIO_BUCKET);
-  if (!exists) {
-    await minio.makeBucket(MINIO_BUCKET);
-    console.log(`Created MinIO bucket: ${MINIO_BUCKET}`);
-    
-    // Set bucket policy to allow public read access
-    // This is needed for presigned URLs to work in browsers
-    const policy = {
-      Version: "2012-10-17",
-      Statement: [
-        {
-          Effect: "Allow",
-          Principal: { AWS: ["*"] },
-          Action: ["s3:GetObject"],
-          Resource: [`arn:aws:s3:::${MINIO_BUCKET}/*`],
-        },
-      ],
-    };
-    
-    try {
-      await minio.setBucketPolicy(MINIO_BUCKET, JSON.stringify(policy));
-      console.log(`Set public read policy for bucket: ${MINIO_BUCKET}`);
-    } catch (error) {
-      console.warn(`Failed to set bucket policy (may already exist):`, error);
-    }
-  }
+  console.log(`[ensureBucket] Using bucket: ${S3_BUCKET}, region: ${S3_REGION}, prefix: ${S3_PREFIX}`);
+  console.log(`[ensureBucket] Bucket check skipped (assuming bucket exists with proper IAM permissions)`);
+  // Skip HeadBucket check - IAM user may only have object-level permissions
+  // The upload will fail with a clear error if the bucket doesn't exist
 }
 
 /**
@@ -120,11 +77,17 @@ export async function uploadFile(
   buffer: Buffer,
   contentType: string = "application/octet-stream"
 ): Promise<string> {
-  const minio = getStorageClient();
+  const s3 = getStorageClient();
+  const fullPath = withPrefix(objectName);
 
-  await minio.putObject(MINIO_BUCKET, objectName, buffer, buffer.length, {
-    "Content-Type": contentType,
-  });
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: S3_BUCKET,
+      Key: fullPath,
+      Body: buffer,
+      ContentType: contentType,
+    })
+  );
 
   return objectName;
 }
@@ -168,18 +131,22 @@ export async function getSignedUrl(
   objectName: string,
   expirySeconds: number = 3600
 ): Promise<string> {
-  const minio = getStorageClient();
+  const s3 = getStorageClient();
+  const fullPath = withPrefix(objectName);
 
   try {
-    const url = await minio.presignedGetObject(
-      MINIO_BUCKET,
-      objectName,
-      expirySeconds
-    );
+    const command = new GetObjectCommand({
+      Bucket: S3_BUCKET,
+      Key: fullPath,
+    });
 
+    const url = await awsGetSignedUrl(s3, command, { expiresIn: expirySeconds });
     return url;
   } catch (error) {
-    console.error(`[getSignedUrl] Failed to generate presigned URL for ${objectName}:`, error);
+    console.error(
+      `[getSignedUrl] Failed to generate presigned URL for ${fullPath}:`,
+      error
+    );
     throw error;
   }
 }
@@ -188,39 +155,60 @@ export async function getSignedUrl(
  * Delete a file from storage
  */
 export async function deleteFile(objectName: string): Promise<void> {
-  const minio = getStorageClient();
-  await minio.removeObject(MINIO_BUCKET, objectName);
+  const s3 = getStorageClient();
+
+  await s3.send(
+    new DeleteObjectCommand({
+      Bucket: S3_BUCKET,
+      Key: withPrefix(objectName),
+    })
+  );
 }
 
 /**
  * Delete all files for a document
  */
 export async function deleteDocumentFiles(docId: string): Promise<void> {
-  const minio = getStorageClient();
-  const prefix = `documents/${docId}/`;
+  const s3 = getStorageClient();
+  const prefix = withPrefix(`documents/${docId}/`);
 
-  const objectsList: string[] = [];
-  const stream = minio.listObjects(MINIO_BUCKET, prefix, true);
+  // List all objects with the prefix
+  const listResponse = await s3.send(
+    new ListObjectsV2Command({
+      Bucket: S3_BUCKET,
+      Prefix: prefix,
+    })
+  );
 
-  for await (const obj of stream) {
-    if (obj.name) {
-      objectsList.push(obj.name);
-    }
+  const objects = listResponse.Contents;
+  if (!objects || objects.length === 0) {
+    return;
   }
 
-  if (objectsList.length > 0) {
-    await minio.removeObjects(MINIO_BUCKET, objectsList);
-  }
+  // Delete all objects
+  await s3.send(
+    new DeleteObjectsCommand({
+      Bucket: S3_BUCKET,
+      Delete: {
+        Objects: objects.map((obj) => ({ Key: obj.Key })),
+      },
+    })
+  );
 }
 
 /**
  * Check if a file exists
  */
 export async function fileExists(objectName: string): Promise<boolean> {
-  const minio = getStorageClient();
+  const s3 = getStorageClient();
 
   try {
-    await minio.statObject(MINIO_BUCKET, objectName);
+    await s3.send(
+      new HeadObjectCommand({
+        Bucket: S3_BUCKET,
+        Key: withPrefix(objectName),
+      })
+    );
     return true;
   } catch {
     return false;
@@ -231,9 +219,17 @@ export async function fileExists(objectName: string): Promise<boolean> {
  * Get file as buffer
  */
 export async function getFile(objectName: string): Promise<Buffer> {
-  const minio = getStorageClient();
+  const s3 = getStorageClient();
 
-  const stream = await minio.getObject(MINIO_BUCKET, objectName);
+  const response = await s3.send(
+    new GetObjectCommand({
+      Bucket: S3_BUCKET,
+      Key: withPrefix(objectName),
+    })
+  );
+
+  // Convert stream to buffer
+  const stream = response.Body as Readable;
   const chunks: Buffer[] = [];
 
   for await (const chunk of stream) {
